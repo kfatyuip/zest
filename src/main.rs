@@ -85,11 +85,16 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                 .unwrap()
                 .to_string();
 
-            if meta.is_dir() {
-                let mut _i = format!("{}/", entry);
-                _vec.push(_i);
-            } else {
+            if meta.is_file() {
                 _vec.push(entry);
+            } else {
+                let mut _i = entry.clone();
+                if meta.is_dir() {
+                    _i = format!("{}/", entry);
+                } else if meta.is_symlink(){
+                    _i = format!("{}@", entry);
+                }
+                _vec.push(_i);
             }
         }
         _vec.sort();
