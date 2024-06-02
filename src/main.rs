@@ -24,12 +24,12 @@ fn plain_html(f: Vec<String>) -> String {
         .to_string();
 
     for i in f.into_iter() {
-        html += &format!("<li><a href=\"{i}\">{i}</a></li>");
+        html += &format!("\n<li><a href=\"{i}\">{i}</a></li>");
     }
-    html += "</ul>
+    html += "\n</ul>
 <hr>
 </body>
-</html>";
+</html>\n";
 
     return html.clone();
 }
