@@ -1,9 +1,5 @@
 use std::{
-    env::current_dir,
-    error::Error,
-    fs::{self, File},
-    io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
+    env::current_dir, error::Error, fs::{self, File}, io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream}
 };
 
 static PORT: i32 = 8080;
@@ -111,8 +107,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             status_code = "404 Not Found";
         }
     }
+    let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
     let header: String = format!(
         "HTTP/{version} {status_code}
+Server: {server_info}
 Content-type: text/{_type}; charset=utf-8
 {_header}\r\n\r\n"
     );
