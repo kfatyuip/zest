@@ -6,7 +6,7 @@ use std::{
     net::{TcpListener, TcpStream},
 };
 
-use chrono::{Utc};
+use chrono::Utc;
 
 static PORT: i32 = 8080;
 
@@ -75,27 +75,19 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             let entry = entry?;
             let meta = entry.metadata()?;
 
+            let entry = entry
+                .path()
+                .strip_prefix(path.clone())
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+
             if meta.is_dir() {
-                let mut _i = format!(
-                    "{}/",
-                    entry
-                        .path()
-                        .strip_prefix(path.clone())
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                );
+                let mut _i = format!("{}/", entry);
                 _vec.push(_i);
             } else {
-                _vec.push(
-                    entry
-                        .path()
-                        .strip_prefix(path.clone())
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                );
+                _vec.push(entry);
             }
         }
 
