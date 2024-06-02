@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
+#[inline(always)]
 fn plain_html(location: &str, f: Vec<String>) -> String {
     let mut html: String = format!(
         "<!DOCTYPE HTML>
