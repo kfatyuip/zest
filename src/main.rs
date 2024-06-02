@@ -1,8 +1,12 @@
 use std::{
-    env::current_dir, error::Error, fs::{self, File}, io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream}
+    env::current_dir,
+    error::Error,
+    fs::{self, File},
+    io::{BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
 };
 
-use chrono::Utc;
+use chrono::{Utc};
 
 static PORT: i32 = 8080;
 
@@ -95,7 +99,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             }
         }
 
-        _content += plain_html(_vec).as_str();
+        let html = plain_html(_vec);
+        _content += &html;
+        _header = format!("Content-Length: {}", html.len());
     } else {
         _type = "plain";
         let mut buffer: String = String::new();
