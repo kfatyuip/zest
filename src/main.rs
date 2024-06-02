@@ -48,19 +48,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     println!("Request: {:?}", http_request);
 
     let mut status_code: &str = "200 OK";
-    let version: &str = http_request
-        .first()
-        .unwrap()
-        .split('/')
-        .last()
-        .unwrap_or("1.1");
-    let location = http_request
-        .first()
-        .unwrap()
-        .split(' ')
-        .nth(1)
-        .unwrap()
-        .trim_start_matches('/');
+    let get: &str = http_request.first().unwrap();
+
+    let version: &str = get.split('/').last().unwrap_or("1.1");
+    let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
     let mut _header: String = String::new();
 
     let mut _content = String::new();
@@ -91,7 +82,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                 let mut _i = entry.clone();
                 if meta.is_dir() {
                     _i = format!("{}/", entry);
-                } else if meta.is_symlink(){
+                } else if meta.is_symlink() {
                     _i = format!("{}@", entry);
                 }
                 _vec.push(_i);
