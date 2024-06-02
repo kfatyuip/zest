@@ -1,5 +1,10 @@
 use std::{
-    env::current_dir, error::Error, fs::{self, File}, io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream}, os::linux::fs::MetadataExt
+    env::current_dir,
+    error::Error,
+    fs::{self, File},
+    io::{BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
+    os::linux::fs::MetadataExt,
 };
 
 use chrono::{DateTime, Utc};
@@ -7,32 +12,19 @@ use chrono::{DateTime, Utc};
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
-enum Status {
-   OK,
-   NotFound,
-}
-
-impl Status {
-    fn to_str(&self) -> &str {
-        match self {
-            Status::OK => "200 OK",
-            Status::NotFound => "404 Not Found",
-        }
-    }
-}
-
-fn plain_html(f: Vec<String>) -> String {
-    let mut html: String = "<!DOCTYPE HTML>
+fn plain_html(location: &str, f: Vec<String>) -> String {
+    let mut html: String = format!(
+        "<!DOCTYPE HTML>
 <html lang=\"en\">
 <head>
 <meta charset=\"utf-8\">
-<title>Directory listing for /</title>
+<title>Directory listing for /{location}</title>
 </head>
 <body>
-<h1>Directory listing for /</h1>
+<h1>Directory listing for /{location}</h1>
 <hr>
 <ul>"
-        .to_string();
+    );
 
     for i in f.into_iter() {
         html += &format!("\n<li><a href=\"{i}\">{i}</a></li>");
@@ -56,7 +48,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     println!("Request: {:?}", http_request);
 
-    let mut status_code: &str = Status::OK.to_str();
+    let mut status_code: &str = "200 OK";
     let get: &str = http_request.first().unwrap();
 
     let version: &str = get.split('/').last().unwrap_or("1.1");
@@ -67,7 +59,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let mut _type: &str;
     let mut _vec: Vec<String> = vec![];
-    let path = current_dir().unwrap().join(location);
+    let path = current_dir()
+        .unwrap()
+        .join(location.split('?').nth(0).unwrap());
     if path.is_dir() {
         _type = "html";
         let paths = fs::read_dir(path.clone())?;
@@ -98,7 +92,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             }
         }
         _vec.sort();
-        let html = plain_html(_vec);
+        let html = plain_html(location, _vec);
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
@@ -117,7 +111,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                     .format(DATE_FORMAT)
             );
         } else {
-            status_code = Status::NotFound.to_str();
+            status_code = "404 Not Found";
         }
     }
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
