@@ -57,6 +57,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         .nth(1)
         .unwrap()
         .trim_start_matches('/');
+    let mut _header: String = String::new();
 
     let mut _content = String::new();
 
@@ -102,15 +103,18 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         let mut buffer: String = String::new();
         let file = File::open(path);
         if file.is_ok() {
-            file.unwrap().read_to_string(&mut buffer)?;
+            let mut file = file.unwrap();
+            file.read_to_string(&mut buffer)?;
             _content += &buffer.replace("\n", "\r\n");
+            _header = format!("Content-Length: {}", file.metadata().unwrap().len());
         } else {
             status_code = "404 Not Found";
         }
     }
     let header: String = format!(
         "HTTP/{version} {status_code}
-Content-type: text/{_type}; charset=utf-8\r\n\r\n"
+Content-type: text/{_type}; charset=utf-8
+{_header}\r\n\r\n"
     );
 
     let content = header + &_content;
