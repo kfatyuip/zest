@@ -52,8 +52,8 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let version: &str = get.split('/').last().unwrap_or("1.1");
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
-    let mut _header: String = String::new();
 
+    let mut _header: String = String::new();
     let mut _content = String::new();
 
     let mut _type: &str;
@@ -129,7 +129,7 @@ Content-type: text/{_type}; charset=utf-8
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT)).unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT))?;
 
     for stream in listener.incoming() {
         let stream = stream?;
