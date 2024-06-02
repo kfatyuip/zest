@@ -1,16 +1,25 @@
 use std::{
-    env::current_dir,
-    error::Error,
-    fs::{self, File},
-    io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
-    os::linux::fs::MetadataExt,
+    env::current_dir, error::Error, fs::{self, File}, io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream}, os::linux::fs::MetadataExt
 };
 
 use chrono::{DateTime, Utc};
 
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
+
+enum Status {
+   OK,
+   NotFound,
+}
+
+impl Status {
+    fn to_str(&self) -> &str {
+        match self {
+            Status::OK => "200 OK",
+            Status::NotFound => "404 Not Found",
+        }
+    }
+}
 
 fn plain_html(f: Vec<String>) -> String {
     let mut html: String = "<!DOCTYPE HTML>
@@ -47,7 +56,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     println!("Request: {:?}", http_request);
 
-    let mut status_code: &str = "200 OK";
+    let mut status_code: &str = Status::OK.to_str();
     let get: &str = http_request.first().unwrap();
 
     let version: &str = get.split('/').last().unwrap_or("1.1");
@@ -108,7 +117,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                     .format(DATE_FORMAT)
             );
         } else {
-            status_code = "404 Not Found";
+            status_code = Status::NotFound.to_str();
         }
     }
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
