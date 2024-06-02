@@ -4,11 +4,13 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
+    os::linux::fs::MetadataExt,
 };
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
 static PORT: i32 = 8080;
+static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 fn plain_html(f: Vec<String>) -> String {
     let mut html: String = "<!DOCTYPE HTML>
@@ -102,13 +104,19 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             let mut file = file.unwrap();
             file.read_to_string(&mut buffer)?;
             _content += &buffer.replace("\n", "\r\n");
-            _header = format!("Content-Length: {}", file.metadata().unwrap().len());
+            _header = format!(
+                "Content-Length: {}\nLast-Modified: {}",
+                file.metadata().unwrap().len(),
+                DateTime::from_timestamp(file.metadata().unwrap().st_mtime(), 0)
+                    .unwrap()
+                    .format(DATE_FORMAT)
+            );
         } else {
             status_code = "404 Not Found";
         }
     }
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
-    let server_date = Utc::now().format("%a, %d %b %Y %H:%M:%S UTC").to_string();
+    let server_date = Utc::now().format(DATE_FORMAT).to_string();
 
     let header: String = format!(
         "HTTP/{version} {status_code}
