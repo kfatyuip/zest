@@ -90,7 +90,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                 _vec.push(entry);
             }
         }
-
+        _vec.sort();
         let html = plain_html(_vec);
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
