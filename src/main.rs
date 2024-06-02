@@ -2,6 +2,8 @@ use std::{
     env::current_dir, error::Error, fs::{self, File}, io::{BufRead, BufReader, Read, Write}, net::{TcpListener, TcpStream}
 };
 
+use chrono::Utc;
+
 static PORT: i32 = 8080;
 
 fn plain_html(f: Vec<String>) -> String {
@@ -108,9 +110,12 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         }
     }
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
+    let server_date = Utc::now().format("%a, %d %b %Y %H:%M:%S UTC").to_string();
+
     let header: String = format!(
         "HTTP/{version} {status_code}
 Server: {server_info}
+Date: {server_date}
 Content-type: text/{_type}; charset=utf-8
 {_header}\r\n\r\n"
     );
