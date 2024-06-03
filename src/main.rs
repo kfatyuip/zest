@@ -64,7 +64,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         .unwrap()
         .join(location.split('?').nth(0).unwrap());
     if path.is_dir() {
-        _type = "html";
+        _type = "text/html";
         let paths = fs::read_dir(path.clone())?;
         _vec = vec![];
 
@@ -97,9 +97,14 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
-        _type = "plain";
         let mut buffer: String = String::new();
-        let file = File::open(path);
+        let file = File::open(path.clone());
+
+        match path.extension().unwrap().to_str().unwrap() {
+            "txt" | "text" => _type = "text/plain",
+            &_ => todo!(),
+        };
+
         if file.is_ok() {
             let mut file = file.unwrap();
             file.read_to_string(&mut buffer)?;
@@ -118,11 +123,17 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
     let server_date = Utc::now().format(DATE_FORMAT).to_string();
 
+    let mut encoding = "";
+
+    if _type.contains("text") {
+        encoding = "; charset=utf-8";
+    }
+
     let header: String = format!(
         "HTTP/{version} {status_code}
 Server: {server_info}
 Date: {server_date}
-Content-type: text/{_type}; charset=utf-8
+Content-type: {_type}{encoding}
 {_header}\r\n\r\n"
     );
 
