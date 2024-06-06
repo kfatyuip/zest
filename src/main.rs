@@ -102,7 +102,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     } else {
         let file = File::open(path.clone());
 
-        let extension = path.extension().unwrap().to_str().unwrap();
+        let extension = path.extension().unwrap().to_str().unwrap_or("txt");
         _type = match extension {
             "jpg" | "png" | "jpeg" | "gif" => format!("image/{extension}"),
             "mp3" | "ogg" | "wav" | "mp4" => format!("audio/{extension}"),
