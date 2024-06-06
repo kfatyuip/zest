@@ -1,5 +1,4 @@
 multi threads support
-support file download (application/octet-stream by identifing file suffix
 toml config support {
 	port
 	block ip (range
