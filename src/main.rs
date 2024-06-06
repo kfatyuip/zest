@@ -13,7 +13,7 @@ static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 #[inline(always)]
-fn plain_html(location: &str, f: Vec<String>) -> String {
+fn location_index(location: &str, f: Vec<String>) -> String {
     let mut html: String = format!(
         "<!DOCTYPE HTML>
 <html lang=\"en\">
@@ -58,13 +58,13 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut _header: String = String::new();
     let mut _content = String::new();
 
-    let mut _type: &str;
+    let mut _type: String;
     let mut _vec: Vec<String> = vec![];
     let path = current_dir()
         .unwrap()
         .join(location.split('?').nth(0).unwrap());
     if path.is_dir() {
-        _type = "text/html";
+        _type = "text/html".to_owned();
         let paths = fs::read_dir(path.clone())?;
         _vec = vec![];
 
@@ -78,7 +78,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                 .unwrap()
                 .to_str()
                 .unwrap()
-                .to_string();
+                .to_owned();
 
             if meta.is_file() {
                 _vec.push(entry);
@@ -93,7 +93,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             }
         }
         _vec.sort();
-        let html = plain_html(location, _vec);
+        let html = location_index(location, _vec);
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
@@ -101,7 +101,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         let file = File::open(path.clone());
 
         match path.extension().unwrap().to_str().unwrap() {
-            "txt" | "text" => _type = "text/plain",
+            "txt" | "text" => _type = "text/plain".to_owned(),
             &_ => todo!(),
         };
 
@@ -123,17 +123,15 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
     let server_date = Utc::now().format(DATE_FORMAT).to_string();
 
-    let mut encoding = "";
-
     if _type.contains("text") {
-        encoding = "; charset=utf-8";
+        _type += "; charset=utf-8";
     }
 
     let header: String = format!(
         "HTTP/{version} {status_code}
 Server: {server_info}
 Date: {server_date}
-Content-type: {_type}{encoding}
+Content-type: {_type}
 {_header}\r\n\r\n"
     );
 
