@@ -105,6 +105,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         let extension = path.extension().unwrap().to_str().unwrap();
         _type = match extension {
             "jpg" | "png" | "jpeg" | "gif" => format!("image/{extension}"),
+            "mp3" | "ogg" | "wav" | "mp4" => format!("audio/{extension}"),
             "txt" | "text" | "toml" | "yaml" | "yml" | "ini" | "xml" | "csv" | "html" | "htm"
             | "md" | "json" => "text/plain".to_owned(),
             &_ => "application/octet-stream".to_owned(),
