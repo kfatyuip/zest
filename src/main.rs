@@ -56,7 +56,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
 
     let mut _header: String = String::new();
-    let mut _content = String::new();
+    let mut content = String::new();
 
     let mut _type: String;
     let mut _vec: Vec<String> = vec![];
@@ -94,7 +94,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         }
         _vec.sort();
         let html = location_index(location, _vec);
-        _content += &html;
+        content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
         let mut buffer: String = String::new();
@@ -108,7 +108,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         if file.is_ok() {
             let mut file = file.unwrap();
             file.read_to_string(&mut buffer)?;
-            _content += &buffer.replace("\n", "\r\n");
+            content += &buffer.replace("\n", "\r\n");
             _header = format!(
                 "Content-Length: {}\nLast-Modified: {}",
                 file.metadata().unwrap().len(),
@@ -135,8 +135,9 @@ Content-type: {_type}
 {_header}\r\n\r\n"
     );
 
-    let content = header + &_content;
+    stream.write_all(header.as_bytes())?;
     stream.write_all(content.as_bytes())?;
+
 
     Ok(())
 }
