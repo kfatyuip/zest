@@ -1,4 +1,5 @@
 multi threads support
+fix symlink 404 error
 toml config support {
 	port
 	block ip (range
