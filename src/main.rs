@@ -28,6 +28,14 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut status_code: &str = "200 OK";
     let get: &str = http_request.first().unwrap();
 
+    // GET /location HTTP/1.1
+    let method: &str = get.split('/').next().unwrap().trim();
+
+    // support "GET" only
+    if method != "GET" {
+        return Ok(());
+    }
+
     let version: &str = get.split('/').last().unwrap_or("1.1");
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
 
