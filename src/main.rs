@@ -1,3 +1,5 @@
+use tsr::route::location_index;
+
 use std::{
     env::current_dir,
     error::Error,
@@ -11,32 +13,6 @@ use chrono::{DateTime, Utc};
 
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
-
-#[inline(always)]
-fn location_index(location: &str, f: Vec<String>) -> String {
-    let mut html: String = format!(
-        "<!DOCTYPE HTML>
-<html lang=\"en\">
-<head>
-<meta charset=\"utf-8\">
-<title>Directory listing for /{location}</title>
-</head>
-<body>
-<h1>Directory listing for /{location}</h1>
-<hr>
-<ul>"
-    );
-
-    for i in f.into_iter() {
-        html += &format!("\n<li><a href=\"{i}\">{i}</a></li>");
-    }
-    html += "\n</ul>
-<hr>
-</body>
-</html>\n";
-
-    return html.clone();
-}
 
 fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let buf_reader = BufReader::new(&mut stream);
