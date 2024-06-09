@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, DirEntry, File},
+    fs::{read_dir, DirEntry, File},
     os::linux::fs::MetadataExt,
     path::PathBuf,
 };
@@ -8,7 +8,7 @@ use chrono::DateTime;
 
 #[inline(always)]
 pub fn location_index(path: PathBuf, location: &str) -> String {
-    let entries = fs::read_dir(path.clone()).unwrap();
+    let entries = read_dir(path.clone()).unwrap();
 
     let mut entries_vec: Vec<DirEntry> = entries.filter_map(|entry| entry.ok()).collect();
     entries_vec.sort_by(|a, b| {

@@ -2,7 +2,7 @@ use tsr::route::{extension_match, file_info, location_index};
 
 use chrono::Utc;
 use std::{
-    env::current_dir,
+    env::{current_dir, var},
     error::Error,
     fs::File,
     io::{BufRead, BufReader, Read, Write},
@@ -11,6 +11,13 @@ use std::{
 
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
+
+#[inline(always)]
+fn get_filesystem_encoindg() -> String {
+    let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
+
+    lang.split('.').last().unwrap().to_owned()
+}
 
 fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let buf_reader = BufReader::new(&mut stream);
@@ -74,7 +81,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let server_date = Utc::now().format(DATE_FORMAT).to_string();
 
     if _type.contains("text") {
-        _type += "; charset=utf-8";
+        _type += &format!("; charset={}", get_filesystem_encoindg());
     }
 
     let header: String = format!(
