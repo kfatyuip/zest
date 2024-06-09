@@ -33,7 +33,7 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
     for entry in entries_vec {
         let meta = entry.metadata().unwrap();
 
-        let entry = entry
+        let mut entry = entry
             .path()
             .strip_prefix(path.clone())
             .unwrap()
@@ -44,6 +44,7 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
         let mut displayname = entry.clone();
         if meta.is_dir() {
             displayname = format!("{}/", entry);
+            entry = format!("{}/", entry); // like python
         } else if meta.is_symlink() {
             displayname = format!("{}@", entry);
         }
