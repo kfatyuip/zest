@@ -4,7 +4,7 @@ use chrono::Utc;
 use std::{
     env::current_dir,
     error::Error,
-    fs::{File},
+    fs::File,
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
 };
@@ -49,7 +49,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut buffer: Vec<u8> = Vec::new();
 
     if path.is_dir() {
-        let html = location_index(path);
+        let html = location_index(path, location);
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
