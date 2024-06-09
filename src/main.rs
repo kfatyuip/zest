@@ -38,7 +38,6 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
 
     let mut _header: String = String::new();
-    let mut _content = String::new();
 
     let mut _type: String = "text/html".to_owned();
     let mut _vec: Vec<String> = vec![];
@@ -50,7 +49,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     if path.is_dir() {
         let html = location_index(path, location);
-        _content += &html;
+        buffer = html.clone().into_bytes();
         _header = format!("Content-Length: {}", html.len());
     } else {
         let mut file = match File::open(path.clone()) {
@@ -86,8 +85,7 @@ Content-type: {_type}
 {_header}\r\n\r\n"
     );
 
-    let content = header + &_content;
-    stream.write_all(content.as_bytes())?;
+    stream.write_all(header.as_bytes())?;
     stream.write_all(&buffer)?;
 
     Ok(())
