@@ -1,15 +1,13 @@
-use tsr::route::{location_index, extension_match};
+use tsr::route::{extension_match, file_info, location_index};
 
+use chrono::Utc;
 use std::{
     env::current_dir,
     error::Error,
     fs::{self, File},
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
-    os::linux::fs::MetadataExt,
 };
-
-use chrono::{DateTime, Utc};
 
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
@@ -84,23 +82,23 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
-        let file = File::open(path.clone());
-
-        let extension = path.extension().unwrap_or_default().to_str().unwrap();
-        _type = extension_match(extension);
-        if file.is_ok() {
-            let mut file = file.unwrap();
-            file.read_to_end(&mut buffer)?;
-            _header = format!(
-                "Content-Length: {}\nLast-Modified: {}",
-                file.metadata().unwrap().len(),
-                DateTime::from_timestamp(file.metadata().unwrap().st_mtime(), 0)
-                    .unwrap()
-                    .format(DATE_FORMAT)
-            );
-        } else {
-            status_code = "404 Not Found";
-        }
+        let mut file = match File::open(path.clone()) {
+            Ok(f) => {
+                let extension = path.extension().unwrap_or_default().to_str().unwrap();
+                _type = extension_match(extension);
+                f
+            }
+            Err(_) => {
+                status_code = "404 Not Found";
+                _type = "text/html".to_owned();
+                match File::open("404.html") {
+                    Ok(f) => f,
+                    Err(e) => return Err(e.into()),
+                }
+            }
+        };
+        file.read_to_end(&mut buffer)?;
+        _header = file_info(file, DATE_FORMAT);
     }
     let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
     let server_date = Utc::now().format(DATE_FORMAT).to_string();

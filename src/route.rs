@@ -1,3 +1,7 @@
+use std::{fs::File, os::linux::fs::MetadataExt};
+
+use chrono::DateTime;
+
 #[inline(always)]
 pub fn location_index(location: &str, f: Vec<String>) -> String {
     let mut html: String = format!(
@@ -35,4 +39,15 @@ pub fn extension_match(extension: &str) -> String {
         "html" | "htm" => "text/html".to_owned(),
         &_ => "application/octet-stream".to_owned(),
     }
+}
+
+#[inline(always)]
+pub fn file_info(file: File, date_format: &str) -> String {
+    return format!(
+        "Content-Length: {}\nLast-Modified: {}",
+        file.metadata().unwrap().len(),
+        DateTime::from_timestamp(file.metadata().unwrap().st_atime(), 0)
+            .unwrap()
+            .format(date_format)
+    );
 }
