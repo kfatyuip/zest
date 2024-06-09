@@ -1,9 +1,17 @@
-use std::{fs::File, os::linux::fs::MetadataExt};
+use std::{
+    fs::{self, File},
+    os::linux::fs::MetadataExt,
+    path::PathBuf,
+};
 
 use chrono::DateTime;
 
 #[inline(always)]
-pub fn location_index(location: &str, f: Vec<String>) -> String {
+pub fn location_index(path: PathBuf) -> String {
+    let paths = fs::read_dir(path.clone()).unwrap();
+    let mut _vec: Vec<String> = vec![];
+
+    let location: &str = path.as_path().to_str().unwrap();
     let mut html: String = format!(
         "<!DOCTYPE HTML>
 <html lang=\"en\">
@@ -16,9 +24,25 @@ pub fn location_index(location: &str, f: Vec<String>) -> String {
 <hr>
 <ul>"
     );
+    for entry in paths {
+        let entry = entry.unwrap();
+        let meta = entry.metadata().unwrap();
 
-    for i in f.into_iter() {
-        html += &format!("\n<li><a href=\"{i}\">{i}</a></li>");
+        let entry = entry
+            .path()
+            .strip_prefix(path.clone())
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+
+        let mut displayname = entry.clone();
+        if meta.is_dir() {
+            displayname = format!("{}/", entry);
+        } else if meta.is_symlink() {
+            displayname = format!("{}@", entry);
+        }
+        html += &format!("\n<li><a href=\"{entry}\">{displayname}</a></li>");
     }
     html += "\n</ul>
 <hr>

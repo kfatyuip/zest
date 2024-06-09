@@ -4,7 +4,7 @@ use chrono::Utc;
 use std::{
     env::current_dir,
     error::Error,
-    fs::{self, File},
+    fs::{File},
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
 };
@@ -40,7 +40,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut _header: String = String::new();
     let mut _content = String::new();
 
-    let mut _type: String;
+    let mut _type: String = "text/html".to_owned();
     let mut _vec: Vec<String> = vec![];
     let path = current_dir()
         .unwrap()
@@ -49,36 +49,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut buffer: Vec<u8> = Vec::new();
 
     if path.is_dir() {
-        _type = "text/html".to_owned();
-        let paths = fs::read_dir(path.clone())?;
-        _vec = vec![];
-
-        for entry in paths {
-            let entry = entry?;
-            let meta = entry.metadata()?;
-
-            let entry = entry
-                .path()
-                .strip_prefix(path.clone())
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_owned();
-
-            if meta.is_file() {
-                _vec.push(entry);
-            } else {
-                let mut _i = entry.clone();
-                if meta.is_dir() {
-                    _i = format!("{}/", entry);
-                } else if meta.is_symlink() {
-                    _i = format!("{}@", entry);
-                }
-                _vec.push(_i);
-            }
-        }
-        _vec.sort();
-        let html = location_index(location, _vec);
+        let html = location_index(path);
         _content += &html;
         _header = format!("Content-Length: {}", html.len());
     } else {
