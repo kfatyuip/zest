@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for stream in listener.incoming() {
         let stream = stream?;
 
-        handle_connection(stream)?;
+        let _ = handle_connection(stream);
     }
 
     Ok(())
