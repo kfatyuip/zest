@@ -55,8 +55,6 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut status_code: &str = "200 OK";
     let get: &str = http_request.first().ok_or("")?;
 
-    info!("{}", get);
-
     // GET /location HTTP/1.1
     let method: &str = get.split('/').next().unwrap().trim();
 
@@ -124,6 +122,8 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
                 .to_string(),
         );
     }
+
+    info!("\"{}\" {}", get ,status_code);
 
     response.set_message(version, status_code);
     stream.write_all(response.message.as_bytes())?;
