@@ -29,7 +29,7 @@ struct Response<'a> {
 impl<'a> Response<'a> {
     #[inline(always)]
     fn set_message(&mut self, version: &str, status_code: &str) {
-        self.message = format!("HTTP/{} {}", version, status_code)
+        self.message = format!("HTTP/{} {}\n", version, status_code)
     }
     #[inline(always)]
     fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
@@ -129,7 +129,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     response.set_message(version, status_code);
     stream.write_all(response.message.as_bytes())?;
     for (key, value) in response._headers_buffer.into_iter() {
-        stream.write_all(format!("{}: {}\r\n", key, value).as_bytes())?;
+        stream.write_all(format!("{}: {}\n", key, value).as_bytes())?;
     }
     stream.write_all("\r\n\r\n".as_bytes())?;
     stream.write_all(&buffer)?;
