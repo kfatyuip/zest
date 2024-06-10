@@ -70,8 +70,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let mut _type: String = "text/html".to_owned();
     let mut _vec: Vec<String> = vec![];
-    let path = current_dir()?
-        .join(location.split('?').nth(0).unwrap());
+    let path = current_dir()?.join(location.split('?').nth(0).unwrap());
 
     let mut buffer: Vec<u8> = Vec::new();
 
@@ -131,7 +130,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     for (key, value) in response._headers_buffer.into_iter() {
         stream.write_all(format!("{}: {}\n", key, value).as_bytes())?;
     }
-    stream.write_all("\r\n\r\n".as_bytes())?;
+    stream.write_all("\r\n".as_bytes())?;
     stream.write_all(&buffer)?;
 
     Ok(())
