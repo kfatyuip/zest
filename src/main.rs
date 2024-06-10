@@ -1,9 +1,10 @@
 use tsr::route::{extension_match, location_index};
 
 use chrono::{DateTime, Utc};
+use log::info;
 use std::{
     collections::HashMap,
-    env::{current_dir, var},
+    env::{self, current_dir, var},
     error::Error,
     fs::File,
     io::{BufRead, BufReader, Read, Write},
@@ -51,10 +52,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         .take_while(|line| !line.is_empty())
         .collect();
 
-    println!("Request: {:?}", http_request);
-
     let mut status_code: &str = "200 OK";
     let get: &str = http_request.first().unwrap();
+
+    info!("{}", get);
 
     // GET /location HTTP/1.1
     let method: &str = get.split('/').next().unwrap().trim();
@@ -138,6 +139,11 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    if !log::log_enabled!(log::Level::Info) {
+        env::set_var("RUST_LOG", "info");
+    }
+    env_logger::init();
+
     let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT))?;
 
     for stream in listener.incoming() {
