@@ -48,7 +48,7 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
         html += &format!("\n<li><a href=\"{linkname}\">{displayname}</a></li>");
     }
     html += "\n</ul>
-<hr>
+</hr>
 </body>
 </html>\n";
 
