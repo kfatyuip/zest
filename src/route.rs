@@ -57,14 +57,7 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
 
 #[inline(always)]
 pub fn extension_match(extension: &str) -> String {
-    match extension {
-        "jpg" | "png" | "jpeg" | "gif" => format!("image/{extension}"),
-        "mp3" | "ogg" | "wav" | "mp4" => format!("audio/{extension}"),
-        "txt" | "text" | "toml" | "yaml" | "yml" | "ini" | "xml" | "csv" | "md" | "json" | "sh" => {
-            "text/plain".to_owned()
-        }
-        "html" | "htm" => "text/html".to_owned(),
-        "ico" => "image/x-icon".to_owned(),
-        &_ => "application/octet-stream".to_owned(),
-    }
+    mime_guess::from_ext(extension)
+        .first()
+        .unwrap_or(mime::APPLICATION_OCTET_STREAM).to_string()
 }

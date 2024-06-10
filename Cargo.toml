@@ -7,4 +7,6 @@ edition = "2021"
 chrono = { version = "0.4.38", features = ["clock", "now"] }
 env_logger = { version = "0.11.3", features = ["color"] }
 log = { version = "0.4.21", default-features = false }
+mime = { version = "0.3.17", default-features = false }
+mime_guess = { version = "2.0.4", default-features = false }
 tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "fs", "io-std", "io-util", "net", "macros"] }
