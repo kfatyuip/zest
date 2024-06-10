@@ -122,7 +122,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         response.send_header("Content-Type", _type);
     }
 
-    info!("\"{}\" {}", get, status_code);
+    info!("\"{}\" {} - {}", get, status_code, stream.peer_addr()?.ip());
 
     response.set_message(version, status_code);
     stream.write_all(response.message.as_bytes()).await?;
