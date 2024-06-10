@@ -1,7 +1,7 @@
 use tsr::route::{extension_match, location_index};
 
 use chrono::{DateTime, Utc};
-use log::info;
+use log::{info, warn};
 use std::{
     collections::HashMap,
     env::{self, current_dir, var},
@@ -59,14 +59,14 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     // GET /location HTTP/1.1
     let method: &str = get.split('/').next().unwrap().trim();
-
-    // support "GET" only
-    if method != "GET" {
-        return Ok(());
-    }
-
     let version: &str = get.split('/').last().unwrap_or("1.1");
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
+
+    if method != "GET" || location.contains("..") {
+        status_code = "301 Moved Permanently";
+        warn!("\"{}\" {} - {}", get, status_code, stream.peer_addr()?.ip());
+        return Ok(());
+    }
 
     let mut _type: String = "text/html".to_owned();
     let path = current_dir()?.join(location.split('?').nth(0).unwrap());
