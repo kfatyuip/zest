@@ -54,7 +54,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     let buf_reader = BufReader::new(&mut stream);
 
-    let get: String = buf_reader.lines().next_line().await?.unwrap();
+    let get = buf_reader.lines().next_line().await?.unwrap();
     let mut status_code: &str = "200 OK";
 
     // GET /location HTTP/1.1
@@ -69,16 +69,16 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
 
     let mut _type: String = "text/html".to_owned();
-    let mut _vec: Vec<String> = vec![];
     let path = current_dir()?.join(location.split('?').nth(0).unwrap());
 
     let mut buffer: Vec<u8> = Vec::new();
 
-    let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
-    let server_date = Utc::now().format(DATE_FORMAT).to_string();
+    response.send_header(
+        "Server",
+        format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION")),
+    );
 
-    response.send_header("Server", server_info);
-    response.send_header("Date", server_date);
+    response.send_header("Date", Utc::now().format(DATE_FORMAT).to_string());
 
     if path.is_dir() {
         let html = location_index(path, location);
