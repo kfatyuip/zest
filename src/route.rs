@@ -60,7 +60,7 @@ pub fn extension_match(extension: &str) -> String {
     match extension {
         "jpg" | "png" | "jpeg" | "gif" => format!("image/{extension}"),
         "mp3" | "ogg" | "wav" | "mp4" => format!("audio/{extension}"),
-        "txt" | "text" | "toml" | "yaml" | "yml" | "ini" | "xml" | "csv" | "md" | "json" => {
+        "txt" | "text" | "toml" | "yaml" | "yml" | "ini" | "xml" | "csv" | "md" | "json" | "sh" => {
             "text/plain".to_owned()
         }
         "html" | "htm" => "text/html".to_owned(),
