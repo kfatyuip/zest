@@ -1,4 +1,5 @@
 multi threads support
+parse http requeset (block invalid "Host"
 toml config support {
 	port
 	block ip (range
