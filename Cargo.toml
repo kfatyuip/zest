@@ -1,7 +1,9 @@
 [package]
 name = "tsr"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]
-chrono = "0.4.38"
+chrono = { version = "0.4.38", features = ["clock", "now"] }
+env_logger = { version = "0.11.3", features = ["color"] }
+log = { version = "0.4.21", default-features = false }
