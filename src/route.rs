@@ -64,6 +64,7 @@ pub fn extension_match(extension: &str) -> String {
             "text/plain".to_owned()
         }
         "html" | "htm" => "text/html".to_owned(),
+        "ico" => "image/x-icon".to_owned(),
         &_ => "application/octet-stream".to_owned(),
     }
 }
