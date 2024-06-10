@@ -6,10 +6,13 @@ use std::{
     collections::HashMap,
     env::{self, current_dir, var},
     error::Error,
-    fs::File,
-    io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
     os::linux::fs::MetadataExt,
+};
+
+use tokio::{
+    fs::File,
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    net::{TcpListener, TcpStream},
 };
 
 static PORT: i32 = 8080;
@@ -38,7 +41,7 @@ impl<'a> Response<'a> {
     }
 }
 
-fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut response: Response = Response {
         message: "HTTP/1.1 200 OK".to_owned(),
         _headers_buffer: HashMap::new(),
@@ -46,14 +49,8 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let buf_reader = BufReader::new(&mut stream);
 
-    let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
-
+    let get: String = buf_reader.lines().next_line().await?.unwrap();
     let mut status_code: &str = "200 OK";
-    let get: &str = http_request.first().ok_or("")?;
 
     // GET /location HTTP/1.1
     let method: &str = get.split('/').next().unwrap().trim();
@@ -88,7 +85,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
         response.send_header("Content-Length", html.len().to_string());
     } else {
-        let mut file = match File::open(path.clone()) {
+        let mut file = match File::open(path.clone()).await {
             Ok(f) => {
                 let extension = path.extension().unwrap_or_default().to_str().unwrap();
                 _type = extension_match(extension);
@@ -97,13 +94,13 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             Err(_) => {
                 status_code = "404 Not Found";
                 _type = "text/html".to_owned();
-                match File::open("404.html") {
+                match File::open("404.html").await {
                     Ok(f) => f,
                     Err(e) => return Err(e.into()),
                 }
             }
         };
-        file.read_to_end(&mut buffer)?;
+        file.read_to_end(&mut buffer).await?;
         if _type.contains("text") {
             response.send_header(
                 "Content-Type",
@@ -113,42 +110,46 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             response.send_header("Content-Type", _type);
         }
 
-        response.send_header("Content-Length", file.metadata()?.len().to_string());
+        response.send_header("Content-Length", file.metadata().await?.len().to_string());
         response.send_header(
             "Last-Modified",
-            DateTime::from_timestamp(file.metadata()?.st_atime(), 0)
+            DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
                 .unwrap()
                 .format(DATE_FORMAT)
                 .to_string(),
         );
     }
 
-    info!("\"{}\" {}", get ,status_code);
+    info!("\"{}\" {}", get, status_code);
 
     response.set_message(version, status_code);
-    stream.write_all(response.message.as_bytes())?;
+    stream.write_all(response.message.as_bytes()).await?;
     for (key, value) in response._headers_buffer.into_iter() {
-        stream.write_all(format!("{}: {}\n", key, value).as_bytes())?;
+        stream
+            .write_all(format!("{}: {}\n", key, value).as_bytes())
+            .await?;
     }
-    stream.write_all("\r\n".as_bytes())?;
-    stream.write_all(&buffer)?;
+    stream.write_all("\r\n".as_bytes()).await?;
+    stream.write_all(&buffer).await?;
+    stream.flush().await?;
 
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     if !log::log_enabled!(log::Level::Info) {
         env::set_var("RUST_LOG", "info");
     }
     env_logger::init();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT))?;
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT)).await?;
 
-    for stream in listener.incoming() {
-        let stream = stream?;
+    loop {
+        let (stream, _) = listener.accept().await?;
 
-        let _ = handle_connection(stream);
+        tokio::spawn(async move {
+            let _ = handle_connection(stream).await;
+        });
     }
-
-    Ok(())
 }
