@@ -53,7 +53,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
         .collect();
 
     let mut status_code: &str = "200 OK";
-    let get: &str = http_request.first().unwrap();
+    let get: &str = http_request.first().ok_or("")?;
 
     info!("{}", get);
 
@@ -70,8 +70,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let mut _type: String = "text/html".to_owned();
     let mut _vec: Vec<String> = vec![];
-    let path = current_dir()
-        .unwrap()
+    let path = current_dir()?
         .join(location.split('?').nth(0).unwrap());
 
     let mut buffer: Vec<u8> = Vec::new();
@@ -117,10 +116,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             response.send_header("Content-Type", _type);
         }
 
-        response.send_header("Content-Length", file.metadata().unwrap().len().to_string());
+        response.send_header("Content-Length", file.metadata()?.len().to_string());
         response.send_header(
             "Last-Modified",
-            DateTime::from_timestamp(file.metadata().unwrap().st_atime(), 0)
+            DateTime::from_timestamp(file.metadata()?.st_atime(), 0)
                 .unwrap()
                 .format(DATE_FORMAT)
                 .to_string(),
