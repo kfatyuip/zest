@@ -1,25 +1,48 @@
-use tsr::route::{extension_match, file_info, location_index};
+use tsr::route::{extension_match, location_index};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use std::{
+    collections::HashMap,
     env::{current_dir, var},
     error::Error,
     fs::File,
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
+    os::linux::fs::MetadataExt,
 };
 
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 #[inline(always)]
-fn get_filesystem_encoindg() -> String {
+fn get_filesystem_encoding() -> String {
     let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
 
     lang.split('.').last().unwrap().to_owned()
 }
 
+struct Response<'a> {
+    message: String,
+    _headers_buffer: HashMap<&'a str, String>,
+}
+
+impl<'a> Response<'a> {
+    #[inline(always)]
+    fn set_message(&mut self, version: &str, status_code: &str) {
+        self.message = format!("HTTP/{} {}", version, status_code)
+    }
+    #[inline(always)]
+    fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
+        self._headers_buffer.insert(k, v)
+    }
+}
+
 fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
+    let mut response: Response = Response {
+        message: "HTTP/1.1 200 OK".to_owned(),
+        _headers_buffer: HashMap::new(),
+    };
+
     let buf_reader = BufReader::new(&mut stream);
 
     let http_request: Vec<_> = buf_reader
@@ -44,8 +67,6 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let version: &str = get.split('/').last().unwrap_or("1.1");
     let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
 
-    let mut _header: String = String::new();
-
     let mut _type: String = "text/html".to_owned();
     let mut _vec: Vec<String> = vec![];
     let path = current_dir()
@@ -54,10 +75,21 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
     let mut buffer: Vec<u8> = Vec::new();
 
+    let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
+    let server_date = Utc::now().format(DATE_FORMAT).to_string();
+
+    response.send_header("Server", server_info);
+    response.send_header("Date", server_date);
+
     if path.is_dir() {
         let html = location_index(path, location);
         buffer = html.clone().into_bytes();
-        _header = format!("Content-Length: {}", html.len());
+        response.send_header(
+            "Content-Type",
+            format!("{_type}; charset={}", get_filesystem_encoding()),
+        );
+
+        response.send_header("Content-Length", html.len().to_string());
     } else {
         let mut file = match File::open(path.clone()) {
             Ok(f) => {
@@ -75,24 +107,31 @@ fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
             }
         };
         file.read_to_end(&mut buffer)?;
-        _header = file_info(file, DATE_FORMAT);
+        if _type.contains("text") {
+            response.send_header(
+                "Content-Type",
+                format!("{_type}; charset={}", get_filesystem_encoding()),
+            );
+        } else {
+            response.send_header("Content-Type", _type);
+        }
+
+        response.send_header("Content-Length", file.metadata().unwrap().len().to_string());
+        response.send_header(
+            "Last-Modified",
+            DateTime::from_timestamp(file.metadata().unwrap().st_atime(), 0)
+                .unwrap()
+                .format(DATE_FORMAT)
+                .to_string(),
+        );
     }
-    let server_info = format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION"));
-    let server_date = Utc::now().format(DATE_FORMAT).to_string();
 
-    if _type.contains("text") {
-        _type += &format!("; charset={}", get_filesystem_encoindg());
+    response.set_message(version, status_code);
+    stream.write_all(response.message.as_bytes())?;
+    for (key, value) in response._headers_buffer.into_iter() {
+        stream.write_all(format!("{}: {}\r\n", key, value).as_bytes())?;
     }
-
-    let header: String = format!(
-        "HTTP/{version} {status_code}
-Server: {server_info}
-Date: {server_date}
-Content-type: {_type}
-{_header}\r\n\r\n"
-    );
-
-    stream.write_all(header.as_bytes())?;
+    stream.write_all("\r\n\r\n".as_bytes())?;
     stream.write_all(&buffer)?;
 
     Ok(())
