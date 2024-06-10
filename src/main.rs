@@ -6,8 +6,13 @@ use std::{
     collections::HashMap,
     env::{self, current_dir, var},
     error::Error,
-    os::linux::fs::MetadataExt,
 };
+
+#[cfg(target_os = "android")]
+use std::os::android::fs::MetadataExt;
+
+#[cfg(target_os = "linux")]
+use std::os::linux::fs::MetadataExt;
 
 use tokio::{
     fs::File,
