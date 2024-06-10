@@ -83,10 +83,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     if path.is_dir() {
         let html = location_index(path, location);
         buffer = html.clone().into_bytes();
-        response.send_header(
-            "Content-Type",
-            format!("{_type}; charset={}", get_filesystem_encoding()),
-        );
 
         response.send_header("Content-Length", html.len().to_string());
     } else {
@@ -106,14 +102,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             }
         };
         file.read_to_end(&mut buffer).await?;
-        if _type.contains("text") {
-            response.send_header(
-                "Content-Type",
-                format!("{_type}; charset={}", get_filesystem_encoding()),
-            );
-        } else {
-            response.send_header("Content-Type", _type);
-        }
 
         response.send_header("Content-Length", file.metadata().await?.len().to_string());
         response.send_header(
@@ -123,6 +111,15 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                 .format(DATE_FORMAT)
                 .to_string(),
         );
+    }
+
+    if _type.contains("text/") {
+        response.send_header(
+            "Content-Type",
+            format!("{_type}; charset={}", get_filesystem_encoding()),
+        );
+    } else {
+        response.send_header("Content-Type", _type);
     }
 
     info!("\"{}\" {}", get, status_code);
