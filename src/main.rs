@@ -70,16 +70,18 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         .unwrap()
         .trim_start_matches('/');
 
-    if method != "GET" || location.contains("..") {
+    let mut _type: String = "text/html".to_owned();
+    let path = current_dir()?
+        .join(location.split('?').nth(0).unwrap())
+        .canonicalize()?;
+
+    let mut buffer: Vec<u8> = Vec::new();
+
+    if method != "GET" || !path.starts_with(current_dir()?) {
         status_code = "301 Moved Permanently";
         warn!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
         return Ok(());
     }
-
-    let mut _type: String = "text/html".to_owned();
-    let path = current_dir()?.join(location.split('?').nth(0).unwrap());
-
-    let mut buffer: Vec<u8> = Vec::new();
 
     response.send_header(
         "Server",
