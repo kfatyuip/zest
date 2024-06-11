@@ -1,4 +1,4 @@
-use tsr::route::{extension_match, location_index};
+use tsr::route::{location_index, mime_match};
 
 use chrono::{DateTime, Utc};
 use log::{info, warn};
@@ -54,17 +54,17 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     let buf_reader = BufReader::new(&mut stream);
 
-    let get = buf_reader.lines().next_line().await?.unwrap();
+    let req = buf_reader.lines().next_line().await?.unwrap();
     let mut status_code: &str = "200 OK";
 
     // GET /location HTTP/1.1
-    let method: &str = get.split('/').next().unwrap().trim();
-    let version: &str = get.split('/').last().unwrap_or("1.1");
-    let location: &str = get.split(' ').nth(1).unwrap().trim_start_matches('/');
+    let method: &str = &req.split('/').next().unwrap().trim();
+    let version: &str = &req.split('/').last().unwrap_or("1.1");
+    let location: &str = &req.split(' ').nth(1).unwrap().trim_start_matches('/');
 
     if method != "GET" || location.contains("..") {
         status_code = "301 Moved Permanently";
-        warn!("\"{}\" {} - {}", get, status_code, stream.peer_addr()?.ip());
+        warn!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
         return Ok(());
     }
 
@@ -88,8 +88,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     } else {
         let mut file = match File::open(path.clone()).await {
             Ok(f) => {
-                let extension = path.extension().unwrap_or_default().to_str().unwrap();
-                _type = extension_match(extension);
+                _type = mime_match(path.to_str().unwrap());
                 f
             }
             Err(_) => {
@@ -122,7 +121,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         response.send_header("Content-Type", _type);
     }
 
-    info!("\"{}\" {} - {}", get, status_code, stream.peer_addr()?.ip());
+    info!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
 
     response.set_message(version, status_code);
     stream.write_all(response.message.as_bytes()).await?;

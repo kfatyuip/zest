@@ -56,8 +56,9 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
 }
 
 #[inline(always)]
-pub fn extension_match(extension: &str) -> String {
-    mime_guess::from_ext(extension)
+pub fn mime_match(path: &str) -> String {
+    mime_guess::from_path(path)
         .first()
-        .unwrap_or(mime::APPLICATION_OCTET_STREAM).to_string()
+        .unwrap_or(mime::APPLICATION_OCTET_STREAM)
+        .to_string()
 }
