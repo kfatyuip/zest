@@ -58,9 +58,17 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     let mut status_code: &str = "200 OK";
 
     // GET /location HTTP/1.1
-    let method: &str = &req.split('/').next().unwrap().trim();
-    let version: &str = &req.split('/').last().unwrap_or("1.1");
-    let location: &str = &req.split(' ').nth(1).unwrap().trim_start_matches('/');
+    let parts: Vec<&str> = req.split('/').collect();
+    let (method, version) = if parts.len() >= 3 {
+        (parts[0].trim(), parts[2])
+    } else {
+        return Ok(());
+    };
+    let location: &str = &req
+        .split_whitespace()
+        .nth(1)
+        .unwrap()
+        .trim_start_matches('/');
 
     if method != "GET" || location.contains("..") {
         status_code = "301 Moved Permanently";
