@@ -31,14 +31,14 @@ fn get_filesystem_encoding() -> String {
 }
 
 struct Response<'a> {
-    message: String,
+    resp: String,
     _headers_buffer: HashMap<&'a str, String>,
 }
 
 impl<'a> Response<'a> {
     #[inline(always)]
-    fn set_message(&mut self, version: &str, status_code: &str) {
-        self.message = format!("HTTP/{} {}\n", version, status_code)
+    fn set_resp(&mut self, version: &str, status_code: &str) {
+        self.resp = format!("HTTP/{} {}\n", version, status_code)
     }
     #[inline(always)]
     fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
@@ -48,7 +48,7 @@ impl<'a> Response<'a> {
 
 async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut response: Response = Response {
-        message: "HTTP/1.1 200 OK".to_owned(),
+        resp: "HTTP/1.1 200 OK".to_owned(),
         _headers_buffer: HashMap::new(),
     };
 
@@ -133,8 +133,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     info!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
 
-    response.set_message(version, status_code);
-    stream.write_all(response.message.as_bytes()).await?;
+    response.set_resp(version, status_code);
+    stream.write_all(response.resp.as_bytes()).await?;
     for (key, value) in response._headers_buffer.into_iter() {
         stream
             .write_all(format!("{}: {}\n", key, value).as_bytes())
