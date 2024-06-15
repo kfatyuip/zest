@@ -31,31 +31,49 @@ fn get_filesystem_encoding() -> String {
 }
 
 struct Response<'a> {
-    resp: String,
+    version: &'a str,
+    status: String,
     _headers_buffer: HashMap<&'a str, String>,
 }
 
 impl<'a> Response<'a> {
     #[inline(always)]
-    fn set_resp(&mut self, version: &str, status_code: &str) {
-        self.resp = format!("HTTP/{} {}\n", version, status_code)
+    fn version(&mut self, v: &'a str) {
+        self.version = v;
     }
     #[inline(always)]
     fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
         self._headers_buffer.insert(k, v)
     }
+    #[inline(always)]
+    fn resp(&mut self) -> String {
+        format!("HTTP/{} {}\n", self.version, self.status)
+    }
+    fn status(&mut self, status_code: i32) {
+        self.status = format!(
+            "{} {}",
+            status_code,
+            match status_code {
+                200 => "OK",
+                404 => "Not Found",
+                301 => "Moved Permanently",
+                _ => "???",
+            }
+        )
+    }
 }
 
 async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut response: Response = Response {
-        resp: "HTTP/1.1 200 OK".to_owned(),
+        version: "1.1",
+        status: "200 OK".to_owned(),
         _headers_buffer: HashMap::new(),
     };
 
     let buf_reader = BufReader::new(&mut stream);
 
     let req = buf_reader.lines().next_line().await?.unwrap();
-    let mut status_code: &str = "200 OK";
+    let mut status_code: i32 = 200;
 
     // GET /location HTTP/1.1
     let parts: Vec<&str> = req.split('/').collect();
@@ -78,7 +96,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     let mut buffer: Vec<u8> = Vec::new();
 
     if method != "GET" || !path.starts_with(current_dir()?) {
-        status_code = "301 Moved Permanently";
+        status_code = 301;
         warn!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
         return Ok(());
     }
@@ -102,7 +120,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                 f
             }
             Err(_) => {
-                status_code = "404 Not Found";
+                status_code = 404;
                 _type = "text/html".to_owned();
                 match File::open("404.html").await {
                     Ok(f) => f,
@@ -133,8 +151,9 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     info!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
 
-    response.set_resp(version, status_code);
-    stream.write_all(response.resp.as_bytes()).await?;
+    response.version(version);
+    response.status(status_code);
+    stream.write_all(response.resp().as_bytes()).await?;
     for (key, value) in response._headers_buffer.into_iter() {
         stream
             .write_all(format!("{}: {}\n", key, value).as_bytes())
