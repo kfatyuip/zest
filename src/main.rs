@@ -1,11 +1,12 @@
 use tsr::route::{location_index, mime_match};
 
 use chrono::{DateTime, Utc};
-use log::{info, warn};
+use log::log;
 use std::{
     collections::HashMap,
     env::{self, current_dir, var},
     error::Error,
+    path::Path,
 };
 
 #[cfg(target_os = "android")]
@@ -23,7 +24,7 @@ use tokio::{
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
-#[inline(always)]
+#[inline]
 fn get_filesystem_encoding() -> String {
     let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
 
@@ -37,15 +38,15 @@ struct Response<'a> {
 }
 
 impl<'a> Response<'a> {
-    #[inline(always)]
+    #[inline]
     fn version(&mut self, v: &'a str) {
         self.version = v;
     }
-    #[inline(always)]
+    #[inline]
     fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
         self._headers_buffer.insert(k, v)
     }
-    #[inline(always)]
+    #[inline]
     fn resp(&mut self) -> String {
         format!("HTTP/{} {}\n", self.version, self.status)
     }
@@ -57,6 +58,7 @@ impl<'a> Response<'a> {
                 200 => "OK",
                 404 => "Not Found",
                 301 => "Moved Permanently",
+                500 => "Internal Server Error",
                 _ => "???",
             }
         )
@@ -69,6 +71,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         status: "200 OK".to_owned(),
         _headers_buffer: HashMap::new(),
     };
+
+    let mut level = log::Level::Info;
 
     let buf_reader = BufReader::new(&mut stream);
 
@@ -89,17 +93,18 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         .trim_start_matches('/');
 
     let mut _type: String = "text/html".to_owned();
-    let path = current_dir()?
-        .join(location.split('?').nth(0).unwrap())
-        .canonicalize()?;
+    let mut path = current_dir()?.join(location.split('?').nth(0).unwrap());
 
     let mut buffer: Vec<u8> = Vec::new();
 
-    if method != "GET" || !path.starts_with(current_dir()?) {
-        status_code = 301;
-        warn!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
-        return Ok(());
-    }
+    path = match path.canonicalize() {
+        Ok(canonical_path) => canonical_path,
+        Err(_) => {
+            status_code = 404;
+            level = log::Level::Warn;
+            current_dir()?.join(Path::new("404.html")).to_path_buf()
+        }
+    };
 
     response.send_header(
         "Server",
@@ -108,48 +113,48 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT).to_string());
 
-    if path.is_dir() {
-        let html = location_index(path, location);
-        buffer = html.clone().into_bytes();
-
-        response.send_header("Content-Length", html.len().to_string());
+    if method != "GET" || !path.starts_with(current_dir()?) {
+        status_code = 301;
+        level = log::Level::Warn;
     } else {
-        let mut file = match File::open(path.clone()).await {
-            Ok(f) => {
-                _type = mime_match(path.to_str().unwrap());
-                f
-            }
-            Err(_) => {
-                status_code = 404;
-                _type = "text/html".to_owned();
-                match File::open("404.html").await {
-                    Ok(f) => f,
-                    Err(e) => return Err(e.into()),
+        if path.is_dir() {
+            let html = location_index(path, location);
+            buffer = html.clone().into_bytes();
+
+            response.send_header("Content-Length", html.len().to_string());
+        } else {
+            match File::open(path.clone()).await {
+                Ok(f) => {
+                    let mut file = f;
+                    _type = mime_match(path.to_str().unwrap());
+                    file.read_to_end(&mut buffer).await?;
+
+                    response
+                        .send_header("Content-Length", file.metadata().await?.len().to_string());
+                    response.send_header(
+                        "Last-Modified",
+                        DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
+                            .unwrap()
+                            .format(DATE_FORMAT)
+                            .to_string(),
+                    );
                 }
-            }
-        };
-        file.read_to_end(&mut buffer).await?;
+                Err(_) => {
+                    status_code = 500;
+                    level = log::Level::Warn;
+                }
+            };
+        }
 
-        response.send_header("Content-Length", file.metadata().await?.len().to_string());
-        response.send_header(
-            "Last-Modified",
-            DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
-                .unwrap()
-                .format(DATE_FORMAT)
-                .to_string(),
-        );
+        if _type.contains("text/") {
+            response.send_header(
+                "Content-Type",
+                format!("{_type}; charset={}", get_filesystem_encoding()),
+            );
+        } else {
+            response.send_header("Content-Type", _type);
+        }
     }
-
-    if _type.contains("text/") {
-        response.send_header(
-            "Content-Type",
-            format!("{_type}; charset={}", get_filesystem_encoding()),
-        );
-    } else {
-        response.send_header("Content-Type", _type);
-    }
-
-    info!("\"{}\" {} - {}", req, status_code, stream.peer_addr()?.ip());
 
     response.version(version);
     response.status(status_code);
@@ -162,6 +167,14 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     stream.write_all("\r\n".as_bytes()).await?;
     stream.write_all(&buffer).await?;
     stream.flush().await?;
+
+    log!(
+        level,
+        "\"{}\" {} - {}",
+        req,
+        status_code,
+        stream.peer_addr()?.ip()
+    );
 
     Ok(())
 }
