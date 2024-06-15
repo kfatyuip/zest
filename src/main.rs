@@ -56,8 +56,9 @@ impl<'a> Response<'a> {
             status_code,
             match status_code {
                 200 => "OK",
-                404 => "Not Found",
                 301 => "Moved Permanently",
+                404 => "Not Found",
+                405 => "Method Not Allowed",
                 500 => "Internal Server Error",
                 _ => "???",
             }
@@ -113,7 +114,10 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT).to_string());
 
-    if method != "GET" || !path.starts_with(current_dir()?) {
+    if method != "GET" {
+        status_code = 405;
+        level = log::Level::Warn;
+    } else if !path.starts_with(current_dir()?) {
         status_code = 301;
         level = log::Level::Warn;
     } else {
