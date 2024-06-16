@@ -1,1 +1,29 @@
-Rusted HTTP Server
+## tsr (release)
+@kfatyuip ➜ /workspaces/tsr (main) $ time wrk http://localhost:8080 -t 2 -d 5s
+Running 5s test @ http://localhost:8080
+  2 threads and 10 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     2.97ms    1.76ms  22.51ms   74.90%
+    Req/Sec     1.48k   479.17     2.25k    62.00%
+  14707 requests in 5.01s, 10.13MB read
+  Socket errors: connect 0, read 14707, write 0, timeout 0
+Requests/sec:   2934.58
+Transfer/sec:      2.02MB
+
+real    0m5.016s
+user    0m0.215s
+sys     0m1.975s
+
+## python -m http.server 8080
+@kfatyuip ➜ /workspaces/tsr (main) $ time wrk http://localhost:8080 -t 2 -d 5s   
+Running 5s test @ http://localhost:8080
+  2 threads and 10 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     7.86ms   13.76ms 214.70ms   98.84%
+    Req/Sec   476.42    135.02   770.00     54.00%
+  4765 requests in 5.03s, 3.81MB read
+Requests/sec:    948.01
+Transfer/sec:    776.74KB                                                        
+real    0m5.032s
+user    0m0.057s
+sys     0m0.512s
