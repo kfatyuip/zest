@@ -171,6 +171,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     stream.write_all("\r\n".as_bytes()).await?;
     stream.write_all(&buffer).await?;
     stream.flush().await?;
+    stream.shutdown().await?;
 
     log!(
         level,
