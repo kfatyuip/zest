@@ -7,12 +7,18 @@ use std::{
 pub fn location_index(path: PathBuf, location: &str) -> String {
     let entries = read_dir(path.clone()).unwrap();
 
+    #[allow(unused_mut)]
     let mut entries_vec: Vec<DirEntry> = entries.filter_map(|entry| entry.ok()).collect();
-    entries_vec.sort_by(|a, b| {
-        a.file_name()
-            .to_ascii_lowercase()
-            .cmp(&b.file_name().to_ascii_lowercase())
-    });
+
+    #[cfg(feature = "index_sort")]
+    {
+        entries_vec.sort_by(|a, b| {
+            a.file_name()
+                .to_ascii_lowercase()
+                .cmp(&b.file_name().to_ascii_lowercase())
+        });
+    }
+
     let mut _vec: Vec<String> = vec![];
 
     let mut html: String = format!(
