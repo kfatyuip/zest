@@ -9,6 +9,9 @@ use std::{
     path::Path,
 };
 
+#[macro_use]
+extern crate lazy_static;
+
 #[cfg(target_os = "android")]
 use std::os::android::fs::MetadataExt;
 
@@ -24,11 +27,12 @@ use tokio::{
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
-#[inline]
-fn get_filesystem_encoding() -> String {
-    let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
+lazy_static! {
+    static ref ENCODING: String = {
+        let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
 
-    lang.split('.').last().unwrap().to_owned()
+        lang.split('.').last().unwrap().to_owned()
+    };
 }
 
 struct Response<'a> {
@@ -59,8 +63,7 @@ impl<'a> Response<'a> {
                 301 => "Moved Permanently",
                 404 => "Not Found",
                 405 => "Method Not Allowed",
-                500 => "Internal Server Error",
-                _ => "???",
+                _ => "Internal Server Error", // 500
             }
         )
     }
@@ -153,7 +156,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         if _type.contains("text/") {
             response.send_header(
                 "Content-Type",
-                format!("{_type}; charset={}", get_filesystem_encoding()),
+                format!("{_type}; charset={}", ENCODING.to_string()),
             );
         } else {
             response.send_header("Content-Type", _type);
