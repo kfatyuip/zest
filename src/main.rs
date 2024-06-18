@@ -168,7 +168,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     stream.write_all(response.resp().as_bytes()).await?;
     for (key, value) in response._headers_buffer.into_iter() {
         stream
-            .write_all(format!("{}: {}\n", key, value).as_bytes())
+            .write_all(format!("{}: {}\r\n", key, value).as_bytes())
             .await?;
     }
     stream.write_all("\r\n".as_bytes()).await?;
