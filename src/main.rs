@@ -134,7 +134,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     if method != "GET" {
         status_code = 405;
         level = log::Level::Warn;
-    } else if !path.starts_with(current_dir()?) {
+    } else if cfg!(not(feature = "auto_index")) && !path.starts_with(current_dir()?) {
         status_code = 301;
         level = log::Level::Warn;
     } else {
