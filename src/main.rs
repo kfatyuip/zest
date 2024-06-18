@@ -102,6 +102,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     let (method, version) = if parts.len() >= 3 {
         (parts[0].trim(), parts[2])
     } else {
+        stream.shutdown().await?;
         return Ok(());
     };
     let location: &str = &req
