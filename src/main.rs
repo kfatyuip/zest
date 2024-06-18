@@ -153,7 +153,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             };
         }
 
-        if _type.contains("text/") {
+        if _type.starts_with("text/") {
             response.send_header(
                 "Content-Type",
                 format!("{_type}; charset={}", ENCODING.to_string()),
