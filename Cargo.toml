@@ -6,12 +6,14 @@ edition = "2021"
 [features]
 default = ["index_sort"]
 index_sort = []
+lru_cache = []
 
 [dependencies]
 chrono = { version = "0.4.38", features = ["clock", "now"] }
 env_logger = { version = "0.11.3", features = ["color"] }
 lazy_static = "1.4.0"
 log = { version = "0.4.21", default-features = false }
+lru = "0.12.3"
 mime = { version = "0.3.17", default-features = false }
 mime_guess = { version = "2.0.4", default-features = false }
 tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "fs", "io-std", "io-util", "net", "macros"] }

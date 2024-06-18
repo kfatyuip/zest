@@ -1,29 +1,24 @@
-## tsr (release)
-@kfatyuip ➜ /workspaces/tsr (main) $ time wrk http://localhost:8080 -t 2 -d 5s
+## tsr (release) with lru_cache
+u0_a217@localhost ~/tsr (main) $ time wrk http://localhost:8080 -t 10 -d 5s
 Running 5s test @ http://localhost:8080
-  2 threads and 10 connections
+10 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     2.97ms    1.76ms  22.51ms   74.90%
-    Req/Sec     1.48k   479.17     2.25k    62.00%
-  14707 requests in 5.01s, 10.13MB read
-  Socket errors: connect 0, read 14707, write 0, timeout 0
-Requests/sec:   2934.58
-Transfer/sec:      2.02MB
+    Latency     1.26ms    0.92ms  16.46ms   85.01%
+    Req/Sec     411.44    55.34   530.00    70.20%
+  20542 requests in 5.02s, 13.58MB read
+Requests/sec:   4088.36
+Transfer/sec:   2.70MB
+wrk http://localhost:8080 -t 10 -d 5s  0.40s user 7.36s system 153% cpu 5.043 total
 
-real    0m5.016s
-user    0m0.215s
-sys     0m1.975s
 
 ## python -m http.server 8080
-@kfatyuip ➜ /workspaces/tsr (main) $ time wrk http://localhost:8080 -t 2 -d 5s   
+u0_a217@localhost ~/tsr (main) $ time wrk http://localhost:8080 -t 10 -d 5s
 Running 5s test @ http://localhost:8080
-  2 threads and 10 connections
+10 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     7.86ms   13.76ms 214.70ms   98.84%
-    Req/Sec   476.42    135.02   770.00     54.00%
-  4765 requests in 5.03s, 3.81MB read
-Requests/sec:    948.01
-Transfer/sec:    776.74KB                                                        
-real    0m5.032s
-user    0m0.057s
-sys     0m0.512s
+    Latency    21.58ms   13.58ms 230.63ms   83.81%
+    Req/Sec    41.37     15.93    79.00     69.36%
+  1521 requests in 5.02s, 1.01MB read
+Requests/sec:    302.90
+Transfer/sec:    205.58KB
+wrk http://localhost:8080 -t 10 -d 5s  0.09s user 1.37s system 28% cpu 5.041 total

@@ -18,6 +18,12 @@ use std::os::android::fs::MetadataExt;
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
 
+#[cfg(feature = "lru_cache")]
+use {
+    lru::{self, LruCache},
+    std::{num::NonZeroUsize, sync::Mutex},
+};
+
 use tokio::{
     fs::File,
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -32,6 +38,14 @@ lazy_static! {
         let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
 
         lang.split('.').last().unwrap().to_owned()
+    };
+}
+
+#[cfg(feature = "lru_cache")]
+lazy_static! {
+    static ref CACHE: Mutex<LruCache<String, String>> = {
+        let cache = LruCache::new(NonZeroUsize::new(8).unwrap());
+        Mutex::new(cache)
     };
 }
 
@@ -125,7 +139,21 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         level = log::Level::Warn;
     } else {
         if path.is_dir() {
-            let html = location_index(path, location);
+            #[allow(unused_mut)]
+            let mut html: String;
+            #[cfg(feature = "lru_cache")]
+            {
+                let mut cache = CACHE.lock().unwrap();
+                if cache.get(&location.to_owned()).is_none() {
+                    cache.put(location.to_owned(), location_index(path, location));
+                }
+                html = cache.get(location).unwrap().to_owned();
+            }
+            #[cfg(not(feature = "lru_cache"))]
+            {
+                html = location_index(path, location);
+            }
+
             buffer = html.clone().into_bytes();
 
             response.send_header("Content-Length", html.len().to_string());
