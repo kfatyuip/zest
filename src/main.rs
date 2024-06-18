@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use log::log;
 use std::{
     collections::HashMap,
-    env::{self, current_dir, var},
+    env::{self, current_dir},
     error::Error,
     path::Path,
 };
@@ -35,7 +35,7 @@ static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 lazy_static! {
     static ref ENCODING: String = {
-        let lang = var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
+        let lang = env::var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
 
         lang.split('.').last().unwrap().to_owned()
     };
