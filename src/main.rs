@@ -145,10 +145,9 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             #[cfg(feature = "lru_cache")]
             {
                 let mut cache = CACHE.lock().unwrap();
-                if cache.get(&location.to_owned()).is_none() {
-                    cache.put(location.to_owned(), location_index(path, location));
-                }
-                html = cache.get(location).unwrap().to_owned();
+                html = cache
+                    .get_or_insert(location.to_owned(), || location_index(path, location))
+                    .to_owned();
             }
             #[cfg(not(feature = "lru_cache"))]
             {
