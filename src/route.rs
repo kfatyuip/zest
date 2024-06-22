@@ -3,6 +3,8 @@ use std::{
     path::PathBuf,
 };
 
+use {mime, mime_guess};
+
 #[inline]
 pub fn location_index(path: PathBuf, location: &str) -> String {
     let entries = read_dir(path.clone()).unwrap();
@@ -62,9 +64,8 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
 }
 
 #[inline]
-pub fn mime_match(path: &str) -> String {
+pub fn mime_match(path: &str) -> mime::Mime {
     mime_guess::from_path(path)
         .first()
         .unwrap_or(mime::APPLICATION_OCTET_STREAM)
-        .to_string()
 }

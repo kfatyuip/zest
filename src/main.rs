@@ -2,6 +2,7 @@ use tsr::route::{location_index, mime_match};
 
 use chrono::{DateTime, Utc};
 use log::log;
+use mime::Mime;
 use std::{
     collections::HashMap,
     env::{self, current_dir},
@@ -10,6 +11,7 @@ use std::{
 };
 
 #[macro_use]
+#[cfg(feature = "lru_cache")]
 extern crate lazy_static;
 
 #[cfg(target_os = "android")]
@@ -33,14 +35,6 @@ use tokio::{
 static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
-lazy_static! {
-    static ref ENCODING: String = {
-        let lang = env::var("LANG").unwrap_or_else(|_| String::from("en_US.UTF-8"));
-
-        lang.split('.').last().unwrap().to_owned()
-    };
-}
-
 #[cfg(feature = "lru_cache")]
 lazy_static! {
     static ref CACHE: Mutex<LruCache<String, String>> = {
@@ -58,10 +52,6 @@ struct Response<'a> {
 }
 
 impl<'a> Response<'a> {
-    #[inline]
-    fn version(&mut self, v: &'a str) {
-        self.version = v;
-    }
     #[inline]
     fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
         self._headers_buffer.insert(k, v)
@@ -115,7 +105,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         return Ok(());
     };
 
-    response.version(version);
+    response.version = version;
     let location = &req
         .split_whitespace()
         .nth(1)
@@ -123,8 +113,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         .trim_start_matches('/')
         .to_owned();
 
-    let mut _type: String = "text/html".to_owned();
-    let mut path = current_dir()?.join(location.split('?').nth(0).unwrap());
+    let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
+    let mut path = current_dir()?.join(location.split('?').next().unwrap());
 
     let mut buffer: Vec<u8> = Vec::new();
 
@@ -170,7 +160,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             match File::open(path.clone()).await {
                 Ok(f) => {
                     let mut file = f;
-                    _type = mime_match(path.to_str().unwrap());
+                    mime_type = mime_match(path.to_str().unwrap());
                     file.read_to_end(&mut buffer).await?;
 
                     response
@@ -189,14 +179,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             };
         }
 
-        if _type.starts_with("text/") {
-            response.send_header(
-                "Content-Type",
-                format!("{_type}; charset={}", ENCODING.to_string()),
-            );
-        } else {
-            response.send_header("Content-Type", _type);
-        }
+        response.send_header("Content-Type", mime_type.to_string());
     }
 
     stream.write_all(response.resp().as_bytes()).await?;
