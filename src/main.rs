@@ -94,7 +94,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     let buf_reader = BufReader::new(&mut stream);
 
-    let req = buf_reader.lines().next_line().await?.unwrap();
+    let req = buf_reader.lines().next_line().await?.unwrap_or_default();
     let mut status_code: i32 = 200;
 
     // GET /location HTTP/1.1
@@ -105,11 +105,12 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         stream.shutdown().await?;
         return Ok(());
     };
-    let location: &str = &req
+    let location = &req
         .split_whitespace()
         .nth(1)
         .unwrap()
-        .trim_start_matches('/');
+        .trim_start_matches('/')
+        .to_owned();
 
     let mut _type: String = "text/html".to_owned();
     let mut path = current_dir()?.join(location.split('?').nth(0).unwrap());
@@ -146,7 +147,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             {
                 let mut cache = CACHE.lock().unwrap();
                 html = cache
-                    .get_or_insert(location.to_owned(), || location_index(path, location))
+                    .get_or_insert(location.clone(), || location_index(path, location))
                     .to_owned();
             }
             #[cfg(not(feature = "lru_cache"))]
