@@ -49,10 +49,12 @@ lazy_static! {
     };
 }
 
+#[derive(Clone)]
 struct Response<'a> {
     version: &'a str,
-    status: String,
+    status_code: i32,
     _headers_buffer: HashMap<&'a str, String>,
+    log_level: log::Level,
 }
 
 impl<'a> Response<'a> {
@@ -66,18 +68,27 @@ impl<'a> Response<'a> {
     }
     #[inline]
     fn resp(&mut self) -> String {
-        format!("HTTP/{} {}\n", self.version, self.status)
+        format!(
+            "HTTP/{} {}\n",
+            self.clone().version,
+            self.status(self.status_code)
+        )
     }
-    fn status(&mut self, status_code: i32) {
-        self.status = format!(
+    fn status(&mut self, status_code: i32) -> String {
+        format!(
             "{} {}",
             status_code,
             match status_code {
                 200 => "OK",
-                301 => "Moved Permanently",
-                404 => "Not Found",
-                405 => "Method Not Allowed",
-                _ => "Internal Server Error", // 500
+                _ => {
+                    self.log_level = log::Level::Warn;
+                    match status_code {
+                        301 => "Moved Permanently",
+                        404 => "Not Found",
+                        405 => "Method Not Allowed",
+                        _ => "Internal Server Error", // 500
+                    }
+                }
             }
         )
     }
@@ -86,16 +97,14 @@ impl<'a> Response<'a> {
 async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
     let mut response: Response = Response {
         version: "1.1",
-        status: "200 OK".to_owned(),
+        status_code: 200,
         _headers_buffer: HashMap::new(),
+        log_level: log::Level::Info,
     };
-
-    let mut level = log::Level::Info;
 
     let buf_reader = BufReader::new(&mut stream);
 
     let req = buf_reader.lines().next_line().await?.unwrap_or_default();
-    let mut status_code: i32 = 200;
 
     // GET /location HTTP/1.1
     let parts: Vec<&str> = req.split('/').collect();
@@ -105,6 +114,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         stream.shutdown().await?;
         return Ok(());
     };
+
+    response.version(version);
     let location = &req
         .split_whitespace()
         .nth(1)
@@ -120,8 +131,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     path = match path.canonicalize() {
         Ok(canonical_path) => canonical_path,
         Err(_) => {
-            status_code = 404;
-            level = log::Level::Warn;
+            response.status_code = 404;
             current_dir()?.join(Path::new("404.html")).to_path_buf()
         }
     };
@@ -134,11 +144,9 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     response.send_header("Date", Utc::now().format(DATE_FORMAT).to_string());
 
     if method != "GET" {
-        status_code = 405;
-        level = log::Level::Warn;
+        response.status_code = 405;
     } else if cfg!(not(feature = "auto_index")) && !path.starts_with(current_dir()?) {
-        status_code = 301;
-        level = log::Level::Warn;
+        response.status_code = 301;
     } else {
         if path.is_dir() {
             #[allow(unused_mut)]
@@ -176,8 +184,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                     );
                 }
                 Err(_) => {
-                    status_code = 500;
-                    level = log::Level::Warn;
+                    response.status_code = 500;
                 }
             };
         }
@@ -192,8 +199,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         }
     }
 
-    response.version(version);
-    response.status(status_code);
     stream.write_all(response.resp().as_bytes()).await?;
     for (key, value) in response._headers_buffer.into_iter() {
         stream
@@ -206,10 +211,10 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     stream.shutdown().await?;
 
     log!(
-        level,
+        response.log_level,
         "\"{}\" {} - {}",
         req,
-        status_code,
+        response.status_code,
         stream.peer_addr()?.ip()
     );
 
