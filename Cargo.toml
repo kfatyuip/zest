@@ -11,6 +11,7 @@ default = ["index_sort"]
 index_sort = []
 lru_cache = []
 auto_index = []
+block_ip = []
 
 [dependencies]
 async-mutex = "1.4.0"
@@ -21,4 +22,6 @@ log = { version = "0.4.21", default-features = false }
 lru = "0.12.3"
 mime = { version = "0.3.17", default-features = false }
 mime_guess = { version = "2.0.4", default-features = false }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_yaml = "0.9.34"
 tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "fs", "io-std", "io-util", "net", "macros"] }

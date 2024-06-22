@@ -1,4 +1,7 @@
-use tsr::route::{location_index, mime_match};
+use tsr::{
+    config::CONFIG,
+    route::{location_index, mime_match},
+};
 
 use chrono::{DateTime, Utc};
 use log::log;
@@ -22,9 +25,9 @@ use std::os::linux::fs::MetadataExt;
 
 #[cfg(feature = "lru_cache")]
 use {
-    async_mutex::Mutex,
     lru::{self, LruCache},
     std::num::NonZeroUsize,
+    async_mutex::Mutex, // faster than tokio::sync::Mutex
 };
 
 use tokio::{
@@ -33,7 +36,6 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-static PORT: i32 = 8080;
 static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 #[cfg(feature = "lru_cache")]
@@ -132,7 +134,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     response.send_header(
         "Server",
-        format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION")),
+        format!("TSR/{}, {}", env!("CARGO_PKG_VERSION"), CONFIG.server.info),
     );
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT));
@@ -213,10 +215,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     env_logger::init();
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", PORT)).await?;
+    let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.host, CONFIG.bind.port)).await?;
 
     loop {
-        let (stream, _) = listener.accept().await?;
+        #[allow(unused_mut)]
+        let (mut stream, _) = listener.accept().await?;
+
+        #[cfg(feature = "allow_ip")]
+        if ! CONFIG.clone().allowlist.unwrap().ips.contains(&stream.peer_addr()?.ip()) {
+            stream.shutdown().await?
+        }
+
+        #[cfg(feature = "block_ip")]
+        if CONFIG.clone().blacklist.unwrap().ips.contains(&stream.peer_addr()?.ip()) {
+            stream.shutdown().await?;
+        }
 
         tokio::spawn(async move {
             let _ = handle_connection(stream).await;
