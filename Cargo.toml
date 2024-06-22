@@ -13,6 +13,7 @@ lru_cache = []
 auto_index = []
 
 [dependencies]
+async-mutex = "1.4.0"
 chrono = { version = "0.4.38", features = ["clock", "now"] }
 env_logger = { version = "0.11.3", features = ["color"] }
 lazy_static = "1.4.0"

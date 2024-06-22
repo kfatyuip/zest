@@ -22,8 +22,9 @@ use std::os::linux::fs::MetadataExt;
 
 #[cfg(feature = "lru_cache")]
 use {
+    async_mutex::Mutex,
     lru::{self, LruCache},
-    std::{num::NonZeroUsize, sync::Mutex},
+    std::num::NonZeroUsize,
 };
 
 use tokio::{
@@ -53,8 +54,11 @@ struct Response<'a> {
 
 impl<'a> Response<'a> {
     #[inline]
-    fn send_header(&mut self, k: &'a str, v: String) -> Option<String> {
-        self._headers_buffer.insert(k, v)
+    fn send_header<T>(&mut self, k: &'a str, v: T) -> Option<String>
+    where
+        T: ToString,
+    {
+        self._headers_buffer.insert(k, v.to_string())
     }
     #[inline]
     fn resp(&mut self) -> String {
@@ -131,7 +135,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         format!("TSR/{}, powered by Rust", env!("CARGO_PKG_VERSION")),
     );
 
-    response.send_header("Date", Utc::now().format(DATE_FORMAT).to_string());
+    response.send_header("Date", Utc::now().format(DATE_FORMAT));
 
     if method != "GET" {
         response.status_code = 405;
@@ -143,7 +147,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             let mut html: String;
             #[cfg(feature = "lru_cache")]
             {
-                let mut cache = CACHE.lock().unwrap();
+                let mut cache = CACHE.lock().await;
                 html = cache
                     .get_or_insert(location.clone(), || location_index(path, location))
                     .to_owned();
@@ -153,9 +157,9 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                 html = location_index(path, location);
             }
 
-            buffer = html.clone().into_bytes();
+            buffer = html.into_bytes();
 
-            response.send_header("Content-Length", html.len().to_string());
+            response.send_header("Content-Length", buffer.len());
         } else {
             match File::open(path.clone()).await {
                 Ok(f) => {
@@ -163,14 +167,12 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                     mime_type = mime_match(path.to_str().unwrap());
                     file.read_to_end(&mut buffer).await?;
 
-                    response
-                        .send_header("Content-Length", file.metadata().await?.len().to_string());
+                    response.send_header("Content-Length", file.metadata().await?.len());
                     response.send_header(
                         "Last-Modified",
                         DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
                             .unwrap()
-                            .format(DATE_FORMAT)
-                            .to_string(),
+                            .format(DATE_FORMAT),
                     );
                 }
                 Err(_) => {
@@ -179,7 +181,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             };
         }
 
-        response.send_header("Content-Type", mime_type.to_string());
+        response.send_header("Content-Type", mime_type);
     }
 
     stream.write_all(response.resp().as_bytes()).await?;
