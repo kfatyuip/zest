@@ -1,24 +1,26 @@
-## tsr (release) with lru_cache
-u0_a217@localhost ~/tsr (main) $ time wrk http://localhost:8080 -t 10 -d 5s
-Running 5s test @ http://localhost:8080
-10 threads and 10 connections
+# cargo r --no-default-features --features=lru_cache
+u0_a217@localhost ~/tsr (main) $ time wrk http://localhost:8080 -t 8 -d 10s
+Running 10s test @ http://localhost:8080
+  8 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency     1.26ms    0.92ms  16.46ms   85.01%
-    Req/Sec     411.44    55.34   530.00    70.20%
-  20542 requests in 5.02s, 13.58MB read
-Requests/sec:   4088.36
-Transfer/sec:   2.70MB
-wrk http://localhost:8080 -t 10 -d 5s  0.40s user 7.36s system 153% cpu 5.043 total
+    Latency   822.29us  516.68us   8.09ms   83.40%
+    Req/Sec   622.76     46.25   757.00     71.25%
+  49647 requests in 10.02s, 32.76MB read
+  Socket errors: connect 0, read 49645, write 0, timeout 0
+Requests/sec:   4955.54
+Transfer/sec:      3.27MB
+wrk http://localhost:8080 -t 8 -d 10s  0.88s user 17.44s system 182% cpu 10.033 total
 
 
-## python -m http.server 8080
-u0_a217@localhost ~/tsr (main) $ time wrk http://localhost:8080 -t 10 -d 5s
-Running 5s test @ http://localhost:8080
-10 threads and 10 connections
+# python -m http.server 8080
+u0_a217@localhost ~/tsr (main) $ time wrk http://localhost:8080 -t 8 -d 10s
+Running 10s test @ http://localhost:8080
+  8 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    21.58ms   13.58ms 230.63ms   83.81%
-    Req/Sec    41.37     15.93    79.00     69.36%
-  1521 requests in 5.02s, 1.01MB read
-Requests/sec:    302.90
-Transfer/sec:    205.58KB
-wrk http://localhost:8080 -t 10 -d 5s  0.09s user 1.37s system 28% cpu 5.041 total
+    Latency    17.17ms   10.83ms 229.50ms   82.50%
+    Req/Sec    52.12     20.60   121.00     70.76%
+  3522 requests in 10.03s, 2.33MB read
+Requests/sec:    351.25
+Transfer/sec:    238.40KB
+wrk http://localhost:8080 -t 8 -d 10s  0.19s user 2.75s system 29% cpu 10.049 total
+u0_a217@localhost ~/tsr (main) $

@@ -4,7 +4,6 @@ use tsr::{
 };
 
 use chrono::{DateTime, Utc};
-use log::log;
 use mime::Mime;
 use std::{
     collections::HashMap,
@@ -12,6 +11,9 @@ use std::{
     error::Error,
     path::Path,
 };
+
+#[cfg(feature = "log")]
+use log::log;
 
 #[macro_use]
 #[cfg(feature = "lru_cache")]
@@ -25,9 +27,9 @@ use std::os::linux::fs::MetadataExt;
 
 #[cfg(feature = "lru_cache")]
 use {
+    async_mutex::Mutex, // faster than tokio::sync::Mutex
     lru::{self, LruCache},
     std::num::NonZeroUsize,
-    async_mutex::Mutex, // faster than tokio::sync::Mutex
 };
 
 use tokio::{
@@ -51,6 +53,8 @@ struct Response<'a> {
     version: &'a str,
     status_code: i32,
     _headers_buffer: HashMap<&'a str, String>,
+
+    #[cfg(feature = "log")]
     log_level: log::Level,
 }
 
@@ -77,7 +81,11 @@ impl<'a> Response<'a> {
             match status_code {
                 200 => "OK",
                 _ => {
-                    self.log_level = log::Level::Warn;
+                    #[cfg(feature = "log")]
+                    {
+                        self.log_level = log::Level::Warn;
+                    }
+
                     match status_code {
                         301 => "Moved Permanently",
                         404 => "Not Found",
@@ -95,6 +103,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         version: "1.1",
         status_code: 200,
         _headers_buffer: HashMap::new(),
+
+        #[cfg(feature = "log")]
         log_level: log::Level::Info,
     };
 
@@ -197,6 +207,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     stream.flush().await?;
     stream.shutdown().await?;
 
+    #[cfg(feature = "log")]
     log!(
         response.log_level,
         "\"{}\" {} - {}",
@@ -222,12 +233,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let (mut stream, _) = listener.accept().await?;
 
         #[cfg(feature = "allow_ip")]
-        if ! CONFIG.clone().allowlist.unwrap().ips.contains(&stream.peer_addr()?.ip()) {
+        if !CONFIG
+            .clone()
+            .allowlist
+            .unwrap()
+            .ips
+            .contains(&stream.peer_addr()?.ip())
+        {
             stream.shutdown().await?
         }
 
         #[cfg(feature = "block_ip")]
-        if CONFIG.clone().blacklist.unwrap().ips.contains(&stream.peer_addr()?.ip()) {
+        if CONFIG
+            .clone()
+            .blacklist
+            .unwrap()
+            .ips
+            .contains(&stream.peer_addr()?.ip())
+        {
             stream.shutdown().await?;
         }
 

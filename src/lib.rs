@@ -1,2 +1,2 @@
-pub mod route;
 pub mod config;
+pub mod route;
