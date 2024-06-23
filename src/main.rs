@@ -1,9 +1,10 @@
 use tsr::{
-    config::{IpListConfig, CONFIG},
+    config::{IpListConfig, CONFIG, CONFIG_PATH},
     route::{location_index, mime_match},
 };
 
 use chrono::{DateTime, Utc};
+use clap::Parser;
 use mime::Mime;
 use std::{collections::HashMap, env, error::Error, path::Path};
 
@@ -144,7 +145,16 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     if method != "GET" {
         response.status_code = 405;
-    } else if cfg!(not(feature = "auto_index")) && !path.starts_with(CONFIG.clone().server.root) {
+    } else if cfg!(not(feature = "auto_index"))
+        && !path.starts_with(
+            CONFIG
+                .clone()
+                .server
+                .root
+                .canonicalize()
+                .expect("bad config path"),
+        )
+    {
         response.status_code = 301;
     } else {
         if path.is_dir() {
@@ -212,6 +222,13 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value = "config.yaml")]
+    config: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "log")]
@@ -222,7 +239,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         env_logger::init();
     }
 
-    let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.host, CONFIG.bind.port)).await?;
+    let arg = Args::parse();
+    *CONFIG_PATH.lock().unwrap() = arg.config;
+
+    let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.host, CONFIG.bind.port))
+        .await
+        .expect("failed to bind");
 
     loop {
         #[allow(unused_mut)]

@@ -1,9 +1,6 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::env::current_dir;
-use std::fs;
-use std::net::IpAddr;
-use std::path::PathBuf;
+use std::{env::current_dir, fs, net::IpAddr, path::PathBuf, sync::Mutex};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -31,11 +28,13 @@ pub struct IpListConfig {
 }
 
 lazy_static! {
+    pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("config.yaml".to_owned());
     pub static ref CONFIG: Config = init_config();
 }
 
 fn init_config() -> Config {
-    match fs::read_to_string("config.yaml") {
+    let config_path = CONFIG_PATH.lock().unwrap();
+    match fs::read_to_string(config_path.to_owned()) {
         Ok(conf) => serde_yaml::from_str(&conf).unwrap(),
         _ => Config {
             bind: BindConfig {
