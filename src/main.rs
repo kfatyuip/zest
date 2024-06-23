@@ -104,7 +104,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     };
 
     let buf_reader = BufReader::new(&mut stream);
-
     let req = buf_reader.lines().next_line().await?.unwrap_or_default();
 
     // GET /location HTTP/1.1
@@ -126,7 +125,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
     let mut path = CONFIG.server.root.join(location.split('?').next().unwrap());
-
     let mut buffer: Vec<u8> = Vec::new();
 
     path = match path.canonicalize() {
@@ -216,10 +214,13 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    if !log::log_enabled!(log::Level::Info) {
-        env::set_var("RUST_LOG", "info");
+    #[cfg(feature = "log")]
+    {
+        if !log::log_enabled!(log::Level::Info) {
+            env::set_var("RUST_LOG", "info");
+        }
+        env_logger::init();
     }
-    env_logger::init();
 
     let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.host, CONFIG.bind.port)).await?;
 
