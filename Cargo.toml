@@ -1,17 +1,19 @@
 [package]
 name = "tsr"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 
 [profile.release]
 debug = 0
 
 [features]
-default = ["index_sort"]
+default = ["index_sort", "log"]
 index_sort = []
 lru_cache = []
 auto_index = []
+allow_ip = []
 block_ip = []
+log = []
 
 [dependencies]
 async-mutex = "1.4.0"
@@ -24,4 +26,12 @@ mime = { version = "0.3.17", default-features = false }
 mime_guess = { version = "2.0.4", default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_yaml = "0.9.34"
-tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread", "fs", "io-std", "io-util", "net", "macros"] }
+tokio = { version = "1.38.0", features = [
+    "rt",
+    "rt-multi-thread",
+    "fs",
+    "io-std",
+    "io-util",
+    "net",
+    "macros",
+] }
