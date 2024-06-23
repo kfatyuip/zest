@@ -1,16 +1,11 @@
 use tsr::{
-    config::CONFIG,
+    config::{IpListConfig, CONFIG},
     route::{location_index, mime_match},
 };
 
 use chrono::{DateTime, Utc};
 use mime::Mime;
-use std::{
-    collections::HashMap,
-    env::{self, current_dir},
-    error::Error,
-    path::Path,
-};
+use std::{collections::HashMap, env, error::Error, path::Path};
 
 #[cfg(feature = "log")]
 use log::log;
@@ -130,7 +125,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         .to_owned();
 
     let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
-    let mut path = current_dir()?.join(location.split('?').next().unwrap());
+    let mut path = CONFIG.server.root.join(location.split('?').next().unwrap());
 
     let mut buffer: Vec<u8> = Vec::new();
 
@@ -138,7 +133,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         Ok(canonical_path) => canonical_path,
         Err(_) => {
             response.status_code = 404;
-            current_dir()?.join(Path::new("404.html")).to_path_buf()
+            CONFIG.server.root.join(Path::new("404.html")).to_path_buf()
         }
     };
 
@@ -151,7 +146,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     if method != "GET" {
         response.status_code = 405;
-    } else if cfg!(not(feature = "auto_index")) && !path.starts_with(current_dir()?) {
+    } else if cfg!(not(feature = "auto_index")) && !path.starts_with(CONFIG.clone().server.root) {
         response.status_code = 301;
     } else {
         if path.is_dir() {
@@ -232,14 +227,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
         #[allow(unused_mut)]
         let (mut stream, addr) = listener.accept().await?;
 
-        #[cfg(feature = "allow_ip")]
-        if !CONFIG.clone().allowlist.unwrap().ips.contains(&addr.ip()) {
-            stream.shutdown().await?
-        }
-
-        #[cfg(feature = "block_ip")]
-        if CONFIG.clone().blacklist.unwrap().ips.contains(&addr.ip()) {
+        if (cfg!(feature = "allow_ip")
+            && !CONFIG
+                .clone()
+                .allowlist
+                .unwrap_or(IpListConfig { ips: vec![] })
+                .ips
+                .contains(&addr.ip()))
+            || (cfg!(feature = "block_ip")
+                && CONFIG
+                    .clone()
+                    .blacklist
+                    .unwrap_or(IpListConfig { ips: vec![] })
+                    .ips
+                    .contains(&addr.ip()))
+        {
             stream.shutdown().await?;
+            continue;
         }
 
         tokio::spawn(async move {

@@ -1,7 +1,9 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::env::current_dir;
 use std::fs;
 use std::net::IpAddr;
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -20,6 +22,7 @@ pub struct BindConfig {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ServerConfig {
     pub info: String,
+    pub root: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -41,6 +44,7 @@ fn init_config() -> Config {
             },
             server: ServerConfig {
                 info: "Powered by Rust".to_owned(),
+                root: current_dir().unwrap(),
             },
             allowlist: None,
             blacklist: None,
