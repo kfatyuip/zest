@@ -6,7 +6,7 @@ use tsr::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use mime::Mime;
-use std::{collections::HashMap, env, error::Error, path::Path};
+use std::{collections::HashMap, env, error::Error, ops::Deref, path::Path};
 
 #[cfg(feature = "log")]
 use log::log;
@@ -95,6 +95,8 @@ impl<'a> Response<'a> {
 }
 
 async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
+    let config = CONFIG.deref();
+
     let mut response: Response = Response {
         version: "1.1",
         status_code: 200,
@@ -125,20 +127,31 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         .to_owned();
 
     let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
-    let mut path = CONFIG.server.root.join(location.split('?').next().unwrap());
+    let mut path = config.server.root.join(location.split('?').next().unwrap());
     let mut buffer: Vec<u8> = Vec::new();
 
     path = match path.canonicalize() {
         Ok(canonical_path) => canonical_path,
         Err(_) => {
             response.status_code = 404;
-            CONFIG.server.root.join(Path::new("404.html")).to_path_buf()
+            config
+                .server
+                .root
+                .join(Path::new(
+                    &config
+                        .server
+                        .error_page
+                        .clone()
+                        .unwrap_or("404.html".into()),
+                ))
+                .to_path_buf()
+                .canonicalize()?
         }
     };
 
     response.send_header(
         "Server",
-        format!("TSR/{}, {}", env!("CARGO_PKG_VERSION"), CONFIG.server.info),
+        format!("TSR/{}, {}", env!("CARGO_PKG_VERSION"), config.server.info),
     );
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT));
@@ -147,7 +160,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         response.status_code = 405;
     } else if cfg!(not(feature = "auto_index"))
         && !path.starts_with(
-            CONFIG
+            config
                 .clone()
                 .server
                 .root
@@ -158,18 +171,24 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         response.status_code = 301;
     } else {
         if path.is_dir() {
+            #[allow(unused_assignments)]
             #[allow(unused_mut)]
-            let mut html: String;
+            let mut html: String = String::new();
             #[cfg(feature = "lru_cache")]
             {
                 let mut cache = CACHE.lock().await;
-                html = cache
-                    .get_or_insert(location.clone(), || location_index(path, location))
-                    .to_owned();
+                if let Some(ctx) = cache.get(location) {
+                    html.clone_from(ctx);
+                } else {
+                    cache
+                        .push(location.clone(), location_index(path, location).await)
+                        .to_owned()
+                        .unwrap();
+                }
             }
             #[cfg(not(feature = "lru_cache"))]
             {
-                html = location_index(path, location);
+                html = location_index(path, location).await;
             }
 
             buffer = html.into_bytes();
@@ -242,7 +261,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let arg = Args::parse();
     *CONFIG_PATH.lock().unwrap() = arg.config;
 
-    let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.host, CONFIG.bind.port))
+    let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.addr, CONFIG.bind.listen))
         .await
         .expect("failed to bind");
 

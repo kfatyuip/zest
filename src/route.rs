@@ -1,17 +1,25 @@
-use std::{
-    fs::{read_dir, DirEntry},
-    path::PathBuf,
-};
+use crate::config::CONFIG;
+use std::{env::current_dir, path::PathBuf};
+use tokio::fs::{self, read_dir, DirEntry};
 
 use {mime, mime_guess};
 
 #[inline]
-pub fn location_index(path: PathBuf, location: &str) -> String {
-    let entries = read_dir(path.clone()).unwrap();
+pub async fn location_index(path: PathBuf, location: &str) -> String {
+    if path == current_dir().unwrap() {
+        if let Some(index) = &CONFIG.server.index {
+            return fs::read_to_string(index.clone()).await.unwrap();
+        }
+    }
+
+    let mut entries = read_dir(path.clone()).await.unwrap();
 
     #[allow(unused_mut)]
-    let mut entries_vec: Vec<DirEntry> = entries.filter_map(|entry| entry.ok()).collect();
+    let mut entries_vec: Vec<DirEntry> = vec![];
 
+    while let Some(entry) = entries.next_entry().await.unwrap() {
+        entries_vec.push(entry);
+    }
     #[cfg(feature = "index_sort")]
     {
         entries_vec.sort_by(|a, b| {
@@ -36,7 +44,7 @@ pub fn location_index(path: PathBuf, location: &str) -> String {
 <ul>"
     );
     for entry in entries_vec {
-        let meta = entry.metadata().unwrap();
+        let meta = entry.metadata().await.unwrap();
 
         let mut linkname = entry
             .path()

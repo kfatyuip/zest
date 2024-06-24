@@ -12,14 +12,16 @@ pub struct Config {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct BindConfig {
-    pub host: String,
-    pub port: i32,
+    pub addr: String,
+    pub listen: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ServerConfig {
     pub info: String,
     pub root: PathBuf,
+    pub index: Option<PathBuf>,
+    pub error_page: Option<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -38,12 +40,14 @@ fn init_config() -> Config {
         Ok(conf) => serde_yaml::from_str(&conf).unwrap(),
         _ => Config {
             bind: BindConfig {
-                host: "0.0.0.0".to_owned(),
-                port: 8080,
+                addr: "0.0.0.0".to_owned(),
+                listen: 8080,
             },
             server: ServerConfig {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap(),
+                index: Some("index.html".to_owned().into()),
+                error_page: Some("404.html".to_owned().into()),
             },
             allowlist: None,
             blacklist: None,
