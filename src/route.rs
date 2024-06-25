@@ -8,7 +8,9 @@ use {mime, mime_guess};
 pub async fn location_index(path: PathBuf, location: &str) -> String {
     if path == current_dir().unwrap() {
         if let Some(index) = &CONFIG.server.index {
-            return fs::read_to_string(index.clone()).await.unwrap();
+            return fs::read_to_string(index.clone())
+                .await
+                .expect("failed to index");
         }
     }
 
