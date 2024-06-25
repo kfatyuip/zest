@@ -6,8 +6,8 @@ use std::{env::current_dir, fs, net::IpAddr, path::PathBuf, sync::Mutex};
 pub struct Config {
     pub bind: BindConfig,
     pub server: ServerConfig,
-    pub allowlist: Option<IpListConfig>,
-    pub blocklist: Option<IpListConfig>,
+    pub allowlist: Option<Vec<IpAddr>>,
+    pub blocklist: Option<Vec<IpAddr>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -22,11 +22,6 @@ pub struct ServerConfig {
     pub root: PathBuf,
     pub index: Option<PathBuf>,
     pub error_page: Option<PathBuf>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct IpListConfig {
-    pub ips: Vec<IpAddr>,
 }
 
 lazy_static! {

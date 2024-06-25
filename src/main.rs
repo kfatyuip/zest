@@ -1,5 +1,5 @@
 use tsr::{
-    config::{IpListConfig, CONFIG, CONFIG_PATH},
+    config::{CONFIG, CONFIG_PATH},
     route::{location_index, mime_match},
 };
 
@@ -273,15 +273,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             && !CONFIG
                 .clone()
                 .allowlist
-                .unwrap_or(IpListConfig { ips: vec![] })
-                .ips
+                .unwrap_or_default()
                 .contains(&addr.ip()))
             || (cfg!(feature = "block_ip")
                 && CONFIG
                     .clone()
                     .blocklist
-                    .unwrap_or(IpListConfig { ips: vec![] })
-                    .ips
+                    .unwrap_or_default()
                     .contains(&addr.ip()))
         {
             stream.shutdown().await?;
