@@ -279,7 +279,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             || (cfg!(feature = "block_ip")
                 && CONFIG
                     .clone()
-                    .blacklist
+                    .blocklist
                     .unwrap_or(IpListConfig { ips: vec![] })
                     .ips
                     .contains(&addr.ip()))

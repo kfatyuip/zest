@@ -7,7 +7,7 @@ pub struct Config {
     pub bind: BindConfig,
     pub server: ServerConfig,
     pub allowlist: Option<IpListConfig>,
-    pub blacklist: Option<IpListConfig>,
+    pub blocklist: Option<IpListConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -50,7 +50,7 @@ fn init_config() -> Config {
                 error_page: Some("404.html".to_owned().into()),
             },
             allowlist: None,
-            blacklist: None,
+            blocklist: None,
         },
     }
 }
