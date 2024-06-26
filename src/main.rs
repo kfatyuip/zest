@@ -151,7 +151,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     response.send_header(
         "Server",
-        format!("TSR/{}, {}", env!("CARGO_PKG_VERSION"), config.server.info),
+        format!("TSR/{} ({})", env!("CARGO_PKG_VERSION"), config.server.info),
     );
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT));

@@ -5,6 +5,7 @@ edition = "2021"
 build = "build.rs"
 
 [profile.release]
+opt-level = 3
 debug = 0
 strip = "symbols"
 lto = true
