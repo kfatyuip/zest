@@ -2,6 +2,7 @@
 name = "tsr"
 version = "0.1.4"
 edition = "2021"
+build = "build.rs"
 
 [profile.release]
 debug = 0
@@ -22,7 +23,7 @@ async-mutex = "1.4.0"
 chrono = { version = "0.4.38", features = ["clock", "now"] }
 clap = { version = "4.5.7", features = ["derive"] }
 env_logger = { version = "0.11.3", features = ["color"] }
-lazy_static = "1.4.0"
+lazy_static = "1.5.0"
 log = { version = "0.4.21" }
 lru = "0.12.3"
 mime = { version = "0.3.17" }
@@ -37,3 +38,7 @@ tokio = { version = "1.38.0", features = [
     "net",
     "macros",
 ] }
+
+[build-dependencies]
+serde_yaml = "0.9.34"
+toml = "0.8.14"

@@ -41,7 +41,7 @@ fn init_config() -> Config {
             server: ServerConfig {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap(),
-                index: Some("index.html".to_owned().into()),
+                index: None,
                 error_page: Some("404.html".to_owned().into()),
             },
             allowlist: None,

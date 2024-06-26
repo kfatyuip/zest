@@ -183,7 +183,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                     cache
                         .push(location.clone(), location_index(path, location).await)
                         .to_owned()
-                        .unwrap();
+                        .unwrap_or_default();
+                    html.clone_from(cache.get(location).unwrap());
                 }
             }
             #[cfg(not(feature = "lru_cache"))]
