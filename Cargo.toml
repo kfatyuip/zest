@@ -13,20 +13,20 @@ lto = true
 [features]
 default = ["index_sort", "log"]
 index_sort = []
-lru_cache = []
+lru_cache = ["dep:lru"]
 auto_index = []
 allow_ip = []
 block_ip = []
-log = []
+log = ["dep:log", "dep:env_logger"]
 
 [dependencies]
 async-mutex = "1.4.0"
 chrono = { version = "0.4.38", features = ["clock", "now"] }
 clap = { version = "4.5.7", features = ["derive"] }
-env_logger = { version = "0.11.3", features = ["color"] }
+env_logger = { version = "0.11.3", features = ["color"] , optional = true }
 lazy_static = "1.5.0"
-log = { version = "0.4.21" }
-lru = "0.12.3"
+log = { version = "0.4.21" , optional = true }
+lru = { version = "0.12.3", optional = true }
 mime = { version = "0.3.17" }
 mime_guess = { version = "2.0.4" }
 serde = { version = "1.0.203", features = ["derive"] }
