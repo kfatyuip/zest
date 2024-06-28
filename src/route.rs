@@ -1,20 +1,36 @@
 use crate::config::CONFIG;
-use std::{env::current_dir, path::PathBuf};
+use std::{
+    env::current_dir,
+    fmt::Write,
+    io,
+    path::{Path, PathBuf},
+};
 use tokio::fs::{self, read_dir, DirEntry};
-
 use {mime, mime_guess};
 
 #[inline]
-pub async fn location_index(path: PathBuf, location: &str) -> String {
+pub async fn location_index(path: PathBuf, location: &str) -> Result<String, io::Error> {
     if path == current_dir().unwrap() {
         if let Some(index) = &CONFIG.server.index {
-            return fs::read_to_string(index.clone())
-                .await
-                .expect("failed to index");
+            return fs::read_to_string(index.clone()).await;
         }
     }
 
     let mut entries = read_dir(path.clone()).await.unwrap();
+
+    let mut html: String = String::with_capacity(1024);
+    html.push_str(&format!(
+        "<!DOCTYPE HTML>
+<html lang=\"en\">
+<head>
+<meta charset=\"utf-8\">
+<title>Directory listing for /{location}</title>
+</head>
+<body>
+<h1>Directory listing for /{location}</h1>
+<hr>
+<ul>"
+    ));
 
     #[allow(unused_mut)]
     let mut entries_vec: Vec<DirEntry> = vec![];
@@ -31,46 +47,46 @@ pub async fn location_index(path: PathBuf, location: &str) -> String {
         });
     }
 
-    let mut _vec: Vec<String> = vec![];
-
-    let mut html: String = format!(
-        "<!DOCTYPE HTML>
-<html lang=\"en\">
-<head>
-<meta charset=\"utf-8\">
-<title>Directory listing for /{location}</title>
-</head>
-<body>
-<h1>Directory listing for /{location}</h1>
-<hr>
-<ul>"
-    );
     for entry in entries_vec {
-        let meta = entry.metadata().await.unwrap();
-
-        let mut linkname = entry
-            .path()
-            .strip_prefix(path.clone())
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned();
-
-        let mut displayname = linkname.clone();
-        if meta.is_dir() {
-            displayname = format!("{}/", linkname);
-            linkname = format!("{}/", linkname); // like python
-        } else if meta.is_symlink() {
-            displayname = format!("{}@", linkname);
-        }
-        html += &format!("\n<li><a href=\"{linkname}\">{displayname}</a></li>");
+        process_entry(&mut html, &entry, &path).await;
     }
-    html += "\n</ul>
+
+    html.push_str(
+        "\n</ul>
 <hr>
 </body>
-</html>\n";
+</html>\n",
+    );
 
-    html
+    Ok(html)
+}
+
+#[inline]
+async fn process_entry(html: &mut String, entry: &DirEntry, path: &Path) {
+    let meta = entry.metadata().await.unwrap();
+    let mut linkname = entry
+        .path()
+        .strip_prefix(path)
+        .unwrap()
+        .display()
+        .to_string();
+
+    let displayname = if meta.is_dir() {
+        linkname = format!("{}/", linkname);
+        linkname.clone()
+    } else if meta.is_symlink() {
+        format!("{}@", linkname)
+    } else {
+        linkname.clone()
+    };
+
+    write!(
+        html,
+        "\n<li><a href=\"{linkname}\">{displayname}</a></li>",
+        linkname = linkname,
+        displayname = displayname
+    )
+    .unwrap();
 }
 
 #[inline]

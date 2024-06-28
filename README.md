@@ -37,14 +37,13 @@ kfatyuip@archlinux [22:45:19] [~/tsr] [main]
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   620.18us  276.88us   6.34ms   75.39%
-    Req/Sec     2.67k   131.27     3.41k    71.71%
-  106893 requests in 10.10s, 75.74MB read
-  Socket errors: connect 0, read 106891, write 0, timeout 0
-Requests/sec:    10583.33
-Transfer/sec:    7.50MB
-wrk http://localhost:8080 -t 4 -d 10s  1.54s user 8.90s system 103% cpu 10.109 to
-tal
+    Latency   368.09us  153.60us   2.68ms   73.04%
+    Req/Sec     3.77k   184.57     4.47k    74.69%
+  151303 requests in 10.10s, 114.28MB read
+  Socket errors: connect 0, read 151300, write 0, timeout 0
+Requests/sec:  14981.07
+Transfer/sec:     11.32MB
+wrk http://localhost:8080 -t 4 -d 10s  1.43s user 10.98s system 122% cpu 10.107 total
 
 kfatyuip@archlinux [22:45:30] [~/tsr] [main]
 -> % time wrk http://localhost:8080 -t 4 -d 10s # python -m http.server 8080

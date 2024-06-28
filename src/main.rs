@@ -64,12 +64,15 @@ impl<'a> Response<'a> {
     }
     #[inline]
     fn resp(&mut self) -> String {
-        format!(
-            "HTTP/{} {}\n",
-            self.clone().version,
-            self.status(self.status_code)
-        )
+        let (version, status_code) = (self.version, self.status_code);
+        let mut resp = format!("HTTP/{} {}\r\n", version, self.status(status_code));
+        for (key, value) in &self._headers_buffer {
+            resp.push_str(&format!("{}: {}\r\n", key, value));
+        }
+        resp.push_str("\r\n");
+        resp
     }
+    #[inline]
     fn status(&mut self, status_code: i32) -> String {
         format!(
             "{} {}",
@@ -181,7 +184,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                     html.clone_from(ctx);
                 } else {
                     cache
-                        .push(location.clone(), location_index(path, location).await)
+                        .push(location.clone(), location_index(path, location).await?)
                         .to_owned()
                         .unwrap_or_default();
                     html.clone_from(cache.get(location).unwrap());
@@ -189,7 +192,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             }
             #[cfg(not(feature = "lru_cache"))]
             {
-                html = location_index(path, location).await;
+                html = location_index(path, location).await?;
             }
 
             buffer = html.into_bytes();
@@ -220,12 +223,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     }
 
     stream.write_all(response.resp().as_bytes()).await?;
-    for (key, value) in response._headers_buffer.into_iter() {
-        stream
-            .write_all(format!("{}: {}\r\n", key, value).as_bytes())
-            .await?;
-    }
-    stream.write_all("\r\n".as_bytes()).await?;
     stream.write_all(&buffer).await?;
     stream.flush().await?;
     stream.shutdown().await?;
