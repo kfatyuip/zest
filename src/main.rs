@@ -148,7 +148,8 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                         .unwrap_or("404.html".into()),
                 ))
                 .to_path_buf()
-                .canonicalize()?
+                .canonicalize()
+                .unwrap_or_default()
         }
     };
 
@@ -161,7 +162,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
 
     if method != "GET" {
         response.status_code = 405;
-    } else if cfg!(not(feature = "auto_index"))
+    } else if config.server.auto_index.unwrap_or(false)
         && !path.starts_with(
             config
                 .clone()
@@ -196,8 +197,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             }
 
             buffer = html.into_bytes();
-
-            response.send_header("Content-Length", buffer.len());
         } else {
             match File::open(path.clone()).await {
                 Ok(f) => {
@@ -205,7 +204,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
                     mime_type = mime_match(path.to_str().unwrap());
                     file.read_to_end(&mut buffer).await?;
 
-                    response.send_header("Content-Length", file.metadata().await?.len());
                     response.send_header(
                         "Last-Modified",
                         DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
@@ -219,6 +217,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
             };
         }
 
+        response.send_header("Content-Length", buffer.len());
         response.send_header("Content-Type", mime_type);
     }
 

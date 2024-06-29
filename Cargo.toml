@@ -1,6 +1,6 @@
 [package]
 name = "tsr"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 build = "build.rs"
 
@@ -14,7 +14,6 @@ lto = true
 default = ["index_sort", "log"]
 index_sort = []
 lru_cache = ["dep:lru"]
-auto_index = []
 allow_ip = []
 block_ip = []
 log = ["dep:log", "dep:env_logger"]

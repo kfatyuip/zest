@@ -6,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::fs::{self, read_dir, DirEntry};
-use {mime, mime_guess};
 
 #[inline]
 pub async fn location_index(path: PathBuf, location: &str) -> Result<String, io::Error> {
