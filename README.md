@@ -20,6 +20,7 @@ bind:
 server:
   info: "Powered by Rust"
   root: .
+  auto_index: off # optional
   index: index.html # optional
   error_page: 404.html # optional
 

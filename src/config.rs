@@ -20,6 +20,7 @@ pub struct BindConfig {
 pub struct ServerConfig {
     pub info: String,
     pub root: PathBuf,
+    pub auto_index: Option<bool>,
     pub index: Option<PathBuf>,
     pub error_page: Option<PathBuf>,
 }
@@ -41,6 +42,7 @@ fn init_config() -> Config {
             server: ServerConfig {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap(),
+                auto_index: Some(false),
                 index: None,
                 error_page: Some("404.html".to_owned().into()),
             },

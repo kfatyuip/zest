@@ -2,21 +2,20 @@ use crate::config::CONFIG;
 use std::{
     env::current_dir,
     fmt::Write,
-    io,
+    io::Result,
     path::{Path, PathBuf},
 };
 use tokio::fs::{self, read_dir, DirEntry};
-use {mime, mime_guess};
 
 #[inline]
-pub async fn location_index(path: PathBuf, location: &str) -> Result<String, io::Error> {
-    if path == current_dir().unwrap() {
+pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
+    if path == current_dir()? {
         if let Some(index) = &CONFIG.server.index {
             return fs::read_to_string(index.clone()).await;
         }
     }
 
-    let mut entries = read_dir(path.clone()).await.unwrap();
+    let mut entries = read_dir(path.clone()).await?;
 
     let mut html: String = String::with_capacity(1024);
     html.push_str(&format!(
@@ -29,13 +28,14 @@ pub async fn location_index(path: PathBuf, location: &str) -> Result<String, io:
 <body>
 <h1>Directory listing for /{location}</h1>
 <hr>
-<ul>"
+<ul>
+"
     ));
 
     #[allow(unused_mut)]
     let mut entries_vec: Vec<DirEntry> = vec![];
 
-    while let Some(entry) = entries.next_entry().await.unwrap() {
+    while let Some(entry) = entries.next_entry().await? {
         entries_vec.push(entry);
     }
     #[cfg(feature = "index_sort")]
@@ -52,10 +52,11 @@ pub async fn location_index(path: PathBuf, location: &str) -> Result<String, io:
     }
 
     html.push_str(
-        "\n</ul>
+        "</ul>
 <hr>
 </body>
-</html>\n",
+</html>
+",
     );
 
     Ok(html)
@@ -80,9 +81,9 @@ async fn process_entry(html: &mut String, entry: &DirEntry, path: &Path) {
         linkname.clone()
     };
 
-    write!(
+    writeln!(
         html,
-        "\n<li><a href=\"{linkname}\">{displayname}</a></li>",
+        "<li><a href=\"{linkname}\">{displayname}</a></li>",
         linkname = linkname,
         displayname = displayname
     )
