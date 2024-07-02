@@ -33,7 +33,7 @@ lazy_static! {
 fn init_config() -> Config {
     let config_path = CONFIG_PATH.lock().unwrap();
     match fs::read_to_string(config_path.to_owned()) {
-        Ok(conf) => serde_yaml::from_str(&conf).unwrap(),
+        Ok(conf) => serde_yml::from_str(&conf).unwrap(),
         _ => Config {
             bind: BindConfig {
                 addr: "0.0.0.0".to_owned(),
