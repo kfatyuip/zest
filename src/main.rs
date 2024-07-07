@@ -34,7 +34,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-static DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
+const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 #[cfg(feature = "lru_cache")]
 lazy_static! {
@@ -49,9 +49,6 @@ struct Response<'a> {
     version: &'a str,
     status_code: i32,
     _headers_buffer: HashMap<&'a str, String>,
-
-    #[cfg(feature = "log")]
-    log_level: log::Level,
 }
 
 impl<'a> Response<'a> {
@@ -76,36 +73,32 @@ impl<'a> Response<'a> {
     fn status(&mut self, status_code: i32) -> String {
         let status = match status_code {
             200 => "OK",
-            _ => {
-                #[cfg(feature = "log")]
-                {
-                    self.log_level = log::Level::Warn;
-                }
-
-                match status_code {
-                    301 => "Moved Permanently",
-                    404 => "Not Found",
-                    405 => "Method Not Allowed",
-                    _ => "Internal Server Error", // 500
-                }
-            }
+            301 => "Moved Permanently",
+            400 => "Bad Request",
+            404 => "Not Found",
+            405 => "Method Not Allowed",
+            _ => "Internal Server Error", // 500
         };
 
         format!("{} {}", status_code, status)
     }
 }
 
-async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<dyn Error>> {
     let config = CONFIG.deref();
 
     let mut response: Response = Response {
         version: "1.1",
         status_code: 200,
         _headers_buffer: HashMap::new(),
-
-        #[cfg(feature = "log")]
-        log_level: log::Level::Info,
     };
+
+    response.send_header(
+        "Server",
+        format!("TSR/{} ({})", env!("CARGO_PKG_VERSION"), config.server.info),
+    );
+
+    response.send_header("Date", Utc::now().format(DATE_FORMAT));
 
     let buf_reader = BufReader::new(&mut stream);
     let req = buf_reader.lines().next_line().await?.unwrap_or_default();
@@ -115,8 +108,11 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     let (method, version) = if parts.len() >= 3 {
         (parts[0].trim(), parts[2])
     } else {
+        response.status_code = 400;
+        stream.write_all(response.resp().as_bytes()).await?;
+        stream.flush().await?;
         stream.shutdown().await?;
-        return Ok(());
+        return Ok((response.status_code, req));
     };
 
     response.version = version;
@@ -151,13 +147,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
         }
     };
 
-    response.send_header(
-        "Server",
-        format!("TSR/{} ({})", env!("CARGO_PKG_VERSION"), config.server.info),
-    );
-
-    response.send_header("Date", Utc::now().format(DATE_FORMAT));
-
     if method != "GET" {
         response.status_code = 405;
     } else if !config.server.auto_index.unwrap_or(false)
@@ -174,7 +163,6 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     } else {
         if path.is_dir() {
             #[allow(unused_assignments)]
-            #[allow(unused_mut)]
             let mut html: String = String::new();
             #[cfg(feature = "lru_cache")]
             {
@@ -224,16 +212,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn Error>> 
     stream.flush().await?;
     stream.shutdown().await?;
 
-    #[cfg(feature = "log")]
-    log!(
-        response.log_level,
-        "\"{}\" {} - {}",
-        req,
-        response.status_code,
-        stream.peer_addr()?.ip()
-    );
-
-    Ok(())
+    Ok((response.status_code, req))
 }
 
 #[derive(Parser)]
@@ -261,7 +240,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .expect("failed to bind");
 
     loop {
-        #[allow(unused_mut)]
         let (mut stream, addr) = listener.accept().await?;
 
         if (cfg!(feature = "allow_ip")
@@ -282,7 +260,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         tokio::spawn(async move {
-            let _ = handle_connection(stream).await;
+            let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
+
+            #[cfg(feature = "log")]
+            {
+                let log_level: log::Level = match _status_code {
+                    200 => log::Level::Info,
+                    400.. => log::Level::Error,
+                    _ => log::Level::Warn,
+                };
+
+                log!(log_level, "\"{}\" {} - {}", _req, _status_code, addr);
+            }
         });
     }
 }
