@@ -32,22 +32,24 @@ lazy_static! {
 
 fn init_config() -> Config {
     let config_path = CONFIG_PATH.lock().unwrap();
-    match fs::read_to_string(config_path.to_owned()) {
-        Ok(conf) => serde_yml::from_str(&conf).unwrap(),
-        _ => Config {
-            bind: BindConfig {
-                addr: "0.0.0.0".to_owned(),
-                listen: 8080,
-            },
-            server: ServerConfig {
-                info: "Powered by Rust".to_owned(),
-                root: current_dir().unwrap(),
-                auto_index: Some(false),
-                index: None,
-                error_page: Some("404.html".to_owned().into()),
-            },
-            allowlist: None,
-            blocklist: None,
+    let default_config = Config {
+        bind: BindConfig {
+            addr: "0.0.0.0".to_owned(),
+            listen: 8080,
         },
+        server: ServerConfig {
+            info: "Powered by Rust".to_owned(),
+            root: current_dir().unwrap_or(".".into()),
+            auto_index: Some(false),
+            index: None,
+            error_page: Some("404.html".to_owned().into()),
+        },
+        allowlist: None,
+        blocklist: None,
+    };
+
+    match fs::read_to_string(config_path.to_owned()) {
+        Ok(conf) => serde_yml::from_str(&conf).unwrap_or(default_config),
+        _ => default_config,
     }
 }
