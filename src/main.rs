@@ -102,109 +102,96 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
 
     let buf_reader = BufReader::new(&mut stream);
     let req = buf_reader.lines().next_line().await?.unwrap_or_default();
+    let mut buffer: Vec<u8> = Vec::new();
 
     // GET /location HTTP/1.1
     let parts: Vec<&str> = req.split('/').collect();
-    let (method, version) = if parts.len() >= 3 {
-        (parts[0].trim(), parts[2])
-    } else {
+
+    if parts.len() < 3 {
         response.status_code = 400;
-        stream.write_all(response.resp().as_bytes()).await?;
-        stream.flush().await?;
-        stream.shutdown().await?;
-        return Ok((response.status_code, req));
-    };
-
-    response.version = version;
-    let location = &req
-        .split_whitespace()
-        .nth(1)
-        .unwrap()
-        .trim_start_matches('/')
-        .to_owned();
-
-    let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
-    let mut path = config.server.root.join(location.split('?').next().unwrap());
-    let mut buffer: Vec<u8> = Vec::new();
-
-    path = match path.canonicalize() {
-        Ok(canonical_path) => canonical_path,
-        Err(_) => {
-            response.status_code = 404;
-            config
-                .server
-                .root
-                .join(Path::new(
-                    &config
-                        .server
-                        .error_page
-                        .clone()
-                        .unwrap_or("404.html".into()),
-                ))
-                .to_path_buf()
-                .canonicalize()
-                .unwrap_or_default()
-        }
-    };
-
-    if method != "GET" {
+    } else if parts[0].trim() != "GET" {
         response.status_code = 405;
-    } else if !config.server.auto_index.unwrap_or(false)
-        && !path.starts_with(
-            config
-                .clone()
-                .server
-                .root
-                .canonicalize()
-                .expect("bad config path"),
-        )
-    {
-        response.status_code = 301;
     } else {
-        if path.is_dir() {
-            #[allow(unused_assignments)]
-            let mut html: String = String::new();
-            #[cfg(feature = "lru_cache")]
-            {
-                let mut cache = CACHE.lock().await;
-                if let Some(ctx) = cache.get(location) {
-                    html.clone_from(ctx);
-                } else {
-                    cache
-                        .push(location.clone(), location_index(path, location).await?)
-                        .to_owned()
-                        .unwrap_or_default();
-                    html.clone_from(cache.get(location).unwrap());
-                }
-            }
-            #[cfg(not(feature = "lru_cache"))]
-            {
-                html = location_index(path, location).await?;
-            }
+        response.version = parts[2];
+        let location = &req
+            .split_whitespace()
+            .nth(1)
+            .unwrap()
+            .trim_start_matches('/')
+            .to_owned();
+        let mut path = config.server.root.join(location.split('?').next().unwrap());
 
-            buffer = html.into_bytes();
+        path = match path.canonicalize() {
+            Ok(canonical_path) => canonical_path,
+            Err(_) => {
+                response.status_code = 404;
+                config
+                    .server
+                    .root
+                    .join(Path::new(
+                        &config
+                            .server
+                            .error_page
+                            .clone()
+                            .unwrap_or("404.html".into()),
+                    ))
+                    .to_path_buf()
+                    .canonicalize()
+                    .unwrap_or_default()
+            }
+        };
+        if !config.server.auto_index.unwrap_or(false)
+            && !path.starts_with(config.server.root.canonicalize().expect("bad config path"))
+        {
+            response.status_code = 301;
         } else {
-            match File::open(path.clone()).await {
-                Ok(f) => {
-                    let mut file = f;
-                    mime_type = mime_match(path.to_str().unwrap());
-                    file.read_to_end(&mut buffer).await?;
+            let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
 
-                    response.send_header(
-                        "Last-Modified",
-                        DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
-                            .unwrap()
-                            .format(DATE_FORMAT),
-                    );
+            if path.is_dir() {
+                #[allow(unused_assignments)]
+                let mut html: String = String::new();
+                #[cfg(feature = "lru_cache")]
+                {
+                    let mut cache = CACHE.lock().await;
+                    if let Some(ctx) = cache.get(location) {
+                        html.clone_from(ctx);
+                    } else {
+                        cache
+                            .push(location.clone(), location_index(path, location).await?)
+                            .to_owned()
+                            .unwrap_or_default();
+                        html.clone_from(cache.get(location).unwrap());
+                    }
                 }
-                Err(_) => {
-                    response.status_code = 500;
+                #[cfg(not(feature = "lru_cache"))]
+                {
+                    html = location_index(path, location).await?;
                 }
-            };
+
+                buffer = html.into_bytes();
+            } else {
+                match File::open(path.clone()).await {
+                    Ok(f) => {
+                        let mut file = f;
+                        mime_type = mime_match(path.to_str().unwrap());
+                        file.read_to_end(&mut buffer).await?;
+
+                        response.send_header(
+                            "Last-Modified",
+                            DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
+                                .unwrap()
+                                .format(DATE_FORMAT),
+                        );
+                    }
+                    Err(_) => {
+                        response.status_code = 500;
+                    }
+                };
+            }
+
+            response.send_header("Content-Length", buffer.len());
+            response.send_header("Content-Type", mime_type);
         }
-
-        response.send_header("Content-Length", buffer.len());
-        response.send_header("Content-Type", mime_type);
     }
 
     stream.write_all(response.resp().as_bytes()).await?;
