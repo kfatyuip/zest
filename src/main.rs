@@ -1,4 +1,7 @@
-use tsr::{
+mod config;
+mod route;
+
+use crate::{
     config::{CONFIG, CONFIG_PATH},
     route::{location_index, mime_match, status_page},
 };
@@ -141,7 +144,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
             }
         };
         if !config.server.auto_index.unwrap_or(false)
-            && !path.starts_with(config.server.root.canonicalize().expect("bad config path"))
+            && !path.starts_with(config.server.root.canonicalize().unwrap())
         {
             response.status_code = 301;
         } else if path.is_dir() {
@@ -229,7 +232,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.addr, CONFIG.bind.listen))
         .await
-        .expect("failed to bind");
+        .unwrap();
 
     loop {
         let (mut stream, addr) = listener.accept().await?;
