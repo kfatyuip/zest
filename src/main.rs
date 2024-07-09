@@ -1,6 +1,6 @@
 use tsr::{
     config::{CONFIG, CONFIG_PATH},
-    route::{location_index, mime_match},
+    route::{location_index, mime_match, status_page},
 };
 
 use chrono::{DateTime, Utc};
@@ -76,7 +76,7 @@ impl<'a> Response<'a> {
             301 => "Moved Permanently",
             400 => "Bad Request",
             404 => "Not Found",
-            405 => "Method Not Allowed",
+            501 => "Not Implemented",
             _ => "Internal Server Error", // 500
         };
 
@@ -93,24 +93,24 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
         _headers_buffer: HashMap::new(),
     };
 
-    response.send_header(
-        "Server",
-        format!("TSR/{} ({})", env!("CARGO_PKG_VERSION"), config.server.info),
-    );
+    let server_info = format!("TSR/{} ({})", env!("CARGO_PKG_VERSION"), config.server.info);
+    response.send_header("Server", server_info.clone());
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT));
 
     let buf_reader = BufReader::new(&mut stream);
     let req = buf_reader.lines().next_line().await?.unwrap_or_default();
-    let mut buffer: Vec<u8> = Vec::new();
 
     // GET /location HTTP/1.1
     let parts: Vec<&str> = req.split('/').collect();
 
+    let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
+    let mut buffer: Vec<u8> = Vec::new();
+
     if parts.len() < 3 {
         response.status_code = 400;
     } else if parts[0].trim() != "GET" {
-        response.status_code = 405;
+        response.status_code = 501;
     } else {
         response.version = parts[2];
         let location = &req
@@ -144,56 +144,61 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
             && !path.starts_with(config.server.root.canonicalize().expect("bad config path"))
         {
             response.status_code = 301;
-        } else {
-            let mut mime_type: Mime = mime::TEXT_HTML_UTF_8;
-
-            if path.is_dir() {
-                #[allow(unused_assignments)]
-                let mut html: String = String::new();
-                #[cfg(feature = "lru_cache")]
-                {
-                    let mut cache = CACHE.lock().await;
-                    if let Some(ctx) = cache.get(location) {
-                        html.clone_from(ctx);
-                    } else {
-                        cache
-                            .push(location.clone(), location_index(path, location).await?)
-                            .to_owned()
-                            .unwrap_or_default();
-                        html.clone_from(cache.get(location).unwrap());
-                    }
+        } else if path.is_dir() {
+            #[allow(unused_assignments)]
+            let mut html: String = String::new();
+            #[cfg(feature = "lru_cache")]
+            {
+                let mut cache = CACHE.lock().await;
+                if let Some(ctx) = cache.get(location) {
+                    html.clone_from(ctx);
+                } else {
+                    cache
+                        .push(location.clone(), location_index(path, location).await?)
+                        .to_owned()
+                        .unwrap_or_default();
+                    html.clone_from(cache.get(location).unwrap());
                 }
-                #[cfg(not(feature = "lru_cache"))]
-                {
-                    html = location_index(path, location).await?;
-                }
-
-                buffer = html.into_bytes();
-            } else {
-                match File::open(path.clone()).await {
-                    Ok(f) => {
-                        let mut file = f;
-                        mime_type = mime_match(path.to_str().unwrap());
-                        file.read_to_end(&mut buffer).await?;
-
-                        response.send_header(
-                            "Last-Modified",
-                            DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
-                                .unwrap()
-                                .format(DATE_FORMAT),
-                        );
-                    }
-                    Err(_) => {
-                        response.status_code = 500;
-                    }
-                };
+            }
+            #[cfg(not(feature = "lru_cache"))]
+            {
+                html = location_index(path, location).await?;
             }
 
-            response.send_header("Content-Length", buffer.len());
-            response.send_header("Content-Type", mime_type);
+            buffer = html.into_bytes();
+        } else {
+            // path.is_file()
+            match File::open(path.clone()).await {
+                Ok(f) => {
+                    let mut file = f;
+                    mime_type = mime_match(path.to_str().unwrap());
+                    file.read_to_end(&mut buffer).await?;
+
+                    response.send_header(
+                        "Last-Modified",
+                        DateTime::from_timestamp(file.metadata().await?.st_atime(), 0)
+                            .unwrap()
+                            .format(DATE_FORMAT),
+                    );
+                }
+                Err(_) => {
+                    response.status_code = 500;
+                }
+            };
         }
     }
 
+    if buffer.is_empty() {
+        buffer = status_page(
+            response.status_code,
+            &response.status(response.status_code),
+            server_info,
+        )
+        .await
+        .into()
+    }
+    response.send_header("Content-Length", buffer.len());
+    response.send_header("Content-Type", mime_type);
     stream.write_all(response.resp().as_bytes()).await?;
     stream.write_all(&buffer).await?;
     stream.flush().await?;

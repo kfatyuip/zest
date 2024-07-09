@@ -63,6 +63,26 @@ pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
 }
 
 #[inline]
+pub async fn status_page(status_code: i32, status: &str, info: String) -> String {
+    match status_code {
+        200 => "".to_owned(),
+        _ => format!("<html>
+<head>
+    <title>{status}</title>
+</head>
+<body>
+    <center>
+        <h1>{status}</h1>
+    </center>
+    <hr>
+    <center>{info}</center>
+</body>
+</html>
+")
+    }
+}
+
+#[inline]
 async fn process_entry(html: &mut String, entry: &DirEntry, path: &Path) {
     let meta = entry.metadata().await.unwrap();
     let mut linkname = entry
