@@ -9,6 +9,16 @@ Options:
   -V, --version          Print version
 ```
 
+**Features**
+
+`log`: print requests to stdout (enabled by default)
+
+`index_sort`: sort files and directories like python http.server (enabled by default)
+
+`lru_cache`: cache the pages for better performance
+
+`allow_ip` & `block_ip`: enable for allowing ip or blocking ip
+
 **Configuration** 
 
 
@@ -24,10 +34,10 @@ server:
   index: index.html # optional
   error_page: 404.html # optional
 
-allowlist: # optional
+allowlist: # requires feature "allow_ip"
   - 127.0.0.1
 
-blocklist: # optional
+blocklist: # requires feature "block_ip"
   - 114.114.114.114
 ```
 
