@@ -1,7 +1,4 @@
-mod config;
-mod route;
-
-use crate::{
+use tsr::{
     config::{CONFIG, CONFIG_PATH},
     route::{location_index, mime_match, status_page},
 };
