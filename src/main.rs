@@ -112,7 +112,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
     } else if parts[0].trim() != "GET" {
         response.status_code = 501;
     } else if let Some(location) = &req.split_whitespace().nth(1) {
-        let location = location.trim_start_matches('/').to_owned();
+        let location: String = urlencoding::decode(location.trim_start_matches('/'))?.into();
 
         response.version = parts[2];
         let mut path = config.server.root.join(location.split('?').next().unwrap());
