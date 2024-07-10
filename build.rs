@@ -1,4 +1,3 @@
-use serde_yaml;
 use std::{env, fs, path::Path};
 use toml::Value;
 
