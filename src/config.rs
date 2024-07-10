@@ -26,7 +26,7 @@ pub struct ServerConfig {
 }
 
 lazy_static! {
-    pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("config.yaml".to_owned());
+    pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("".to_owned());
     pub static ref CONFIG: Config = init_config();
 }
 

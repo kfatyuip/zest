@@ -42,7 +42,7 @@ const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 #[cfg(feature = "lru_cache")]
 lazy_static! {
     static ref CACHE: Mutex<LruCache<String, String>> = {
-        let cache = LruCache::new(NonZeroUsize::new(8).unwrap());
+        let cache = LruCache::new(NonZeroUsize::new(64).unwrap());
         Mutex::new(cache)
     };
 }
@@ -114,14 +114,10 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
         response.status_code = 400;
     } else if parts[0].trim() != "GET" {
         response.status_code = 501;
-    } else {
+    } else if let Some(location) = &req.split_whitespace().nth(1) {
+        let location = location.trim_start_matches('/').to_owned();
+
         response.version = parts[2];
-        let location = &req
-            .split_whitespace()
-            .nth(1)
-            .unwrap()
-            .trim_start_matches('/')
-            .to_owned();
         let mut path = config.server.root.join(location.split('?').next().unwrap());
 
         path = match path.canonicalize() {
@@ -153,19 +149,19 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
             #[cfg(feature = "lru_cache")]
             {
                 let mut cache = CACHE.lock().await;
-                if let Some(ctx) = cache.get(location) {
+                if let Some(ctx) = cache.get(&location) {
                     html.clone_from(ctx);
                 } else {
                     cache
-                        .push(location.clone(), location_index(path, location).await?)
+                        .push(location.clone(), location_index(path, &location).await?)
                         .to_owned()
                         .unwrap_or_default();
-                    html.clone_from(cache.get(location).unwrap());
+                    html.clone_from(cache.get(&location).unwrap());
                 }
             }
             #[cfg(not(feature = "lru_cache"))]
             {
-                html = location_index(path, location).await?;
+                html = location_index(path, &location).await?;
             }
 
             buffer = html.into_bytes();
@@ -189,9 +185,11 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
                 }
             };
         }
+    } else {
+        response.status_code = 400;
     }
 
-    if buffer.is_empty() {
+    if response.status_code != 200 {
         buffer = status_page(
             response.status_code,
             &response.status(response.status_code),
@@ -213,7 +211,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "config.yaml")]
+    #[arg(short, long, default_value = "")]
     config: String,
 }
 
