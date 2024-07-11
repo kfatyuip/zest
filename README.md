@@ -6,7 +6,7 @@
 Usage: tsr [OPTIONS]
 
 Options:
-  -c, --config <CONFIG>  [default: config.yaml]
+  -c, --config <CONFIG>  [default: ]
   -h, --help             Print help
   -V, --version          Print version
 ```
