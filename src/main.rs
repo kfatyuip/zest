@@ -24,7 +24,7 @@ use std::os::linux::fs::MetadataExt;
 #[cfg(feature = "lru_cache")]
 use {
     async_mutex::Mutex, // faster than tokio::sync::Mutex
-    lru::{self, LruCache},
+    lru::LruCache,
     std::num::NonZeroUsize,
 };
 
