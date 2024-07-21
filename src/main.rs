@@ -223,11 +223,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let arg = Args::parse();
-    *CONFIG_PATH.lock().unwrap() = arg.config;
+    *CONFIG_PATH.lock()? = arg.config;
 
-    let listener = TcpListener::bind(format!("{}:{}", CONFIG.bind.addr, CONFIG.bind.listen))
-        .await
-        .unwrap();
+    let listener =
+        TcpListener::bind(format!("{}:{}", CONFIG.bind.addr, CONFIG.bind.listen)).await?;
 
     loop {
         let (mut stream, addr) = listener.accept().await?;
