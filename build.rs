@@ -7,7 +7,7 @@ fn main() {
     let config_path = Path::new(&root_path).join("config.yaml");
     if config_path.exists() {
         let content = fs::read_to_string(config_path).unwrap();
-        let config: Value = serde_yaml::from_str(&content).unwrap();
+        let config: Value = serde_yml::from_str(&content).unwrap();
 
         if config.get("allowip").is_some() {
             println!("cargo:rustc-cfg=feature=\"allow_ip\"");
