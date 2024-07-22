@@ -45,7 +45,7 @@ blocklist: # requires feature "block_ip"
 
 **Benchmark (wrk)**
 ```text
-kfatyuip@archlinux [19:32:18] [~] 
+kfatyuip@archlinux [19:32:18] [~/tsr] [main]
 -> % time wrk http://localhost:8080 -t 4 -d 10s # cargo run --no-default-features --features=lru_cache --release
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
