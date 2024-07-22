@@ -6,7 +6,7 @@ use tsr::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use mime::Mime;
-use std::{collections::HashMap, env, error::Error, ops::Deref, path::Path};
+use std::{collections::HashMap, env, error::Error, io, ops::Deref, path::Path};
 
 #[cfg(feature = "log")]
 use log::log;
@@ -84,7 +84,7 @@ impl<'a> Response<'a> {
     }
 }
 
-async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<dyn Error>> {
+async fn handle_connection(mut stream: TcpStream) -> io::Result<(i32, String)> {
     let config = CONFIG.deref();
 
     let mut response: Response = Response {
@@ -112,7 +112,9 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(i32, String), Box<d
     } else if parts[0].trim() != "GET" {
         response.status_code = 501;
     } else if let Some(location) = &req.split_whitespace().nth(1) {
-        let location: String = urlencoding::decode(location.trim_start_matches('/'))?.into();
+        let location: String = urlencoding::decode(location.trim_start_matches('/'))
+            .unwrap_or_default()
+            .into();
 
         response.version = parts[2];
         let mut path = config.server.root.join(location.split('?').next().unwrap());
