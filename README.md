@@ -1,16 +1,5 @@
 ## Rusted HTTP Server [![Rust](https://github.com/kfatyuip/tsr/actions/workflows/rust.yml/badge.svg)](https://github.com/kfatyuip/tsr/actions/workflows/rust.yml)
 
-**Command**
-
-```text
-Usage: tsr [OPTIONS]
-
-Options:
-  -c, --config <CONFIG>  [default: ]
-  -h, --help             Print help
-  -V, --version          Print version
-```
-
 **Features**
 
 `log`: print requests to stdout (enabled by default)

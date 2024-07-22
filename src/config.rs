@@ -35,7 +35,7 @@ fn init_config() -> Config {
     let default_config = Config {
         bind: BindConfig {
             addr: "0.0.0.0".to_owned(),
-            listen: 8080,
+            listen: 80,
         },
         server: ServerConfig {
             info: "Powered by Rust".to_owned(),

@@ -189,13 +189,9 @@ async fn handle_connection(mut stream: TcpStream) -> io::Result<(i32, String)> {
     }
 
     if response.status_code != 200 {
-        buffer = status_page(
-            response.status_code,
-            &response.status(response.status_code),
-            server_info,
-        )
-        .await
-        .into()
+        buffer = status_page(&response.status(response.status_code), server_info)
+            .await
+            .into()
     }
     response.send_header("Content-Length", buffer.len());
     response.send_header("Content-Type", mime_type);
@@ -210,8 +206,11 @@ async fn handle_connection(mut stream: TcpStream) -> io::Result<(i32, String)> {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "")]
-    config: String,
+    #[arg(short, long, default_value = None, help = "set config file path")]
+    config: Option<String>,
+
+    #[arg(short, long, default_value = None, help = "set the listening port")]
+    port: Option<i32>,
 }
 
 #[tokio::main]
@@ -225,10 +224,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let arg = Args::parse();
-    *CONFIG_PATH.lock()? = arg.config;
+    *CONFIG_PATH.lock()? = arg.config.unwrap_or(String::new());
 
-    let listener =
-        TcpListener::bind(format!("{}:{}", CONFIG.bind.addr, CONFIG.bind.listen)).await?;
+    let listener = TcpListener::bind(format!(
+        "{}:{}",
+        CONFIG.bind.addr,
+        arg.port.unwrap_or(CONFIG.bind.listen)
+    ))
+    .await?;
 
     loop {
         let (mut stream, addr) = listener.accept().await?;

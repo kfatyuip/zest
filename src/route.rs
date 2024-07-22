@@ -63,11 +63,9 @@ pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
 }
 
 #[inline]
-pub async fn status_page(status_code: i32, status: &str, info: String) -> String {
-    match status_code {
-        200 => "".to_owned(),
-        _ => format!(
-            "<html>
+pub async fn status_page(status: &str, info: String) -> String {
+    format!(
+        "<html>
 <head>
     <title>{status}</title>
 </head>
@@ -80,8 +78,7 @@ pub async fn status_page(status_code: i32, status: &str, info: String) -> String
 </body>
 </html>
 "
-        ),
-    }
+    )
 }
 
 #[inline]
