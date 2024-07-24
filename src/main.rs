@@ -109,14 +109,14 @@ async fn handle_connection(mut stream: TcpStream) -> io::Result<(i32, String)> {
 
     if parts.len() < 3 {
         response.status_code = 400;
-    } else if parts[0].trim() != "GET" {
+    } else if parts.first().unwrap().trim() != "GET" {
         response.status_code = 501;
     } else if let Some(location) = &req.split_whitespace().nth(1) {
         let location: String = urlencoding::decode(location.trim_start_matches('/'))
             .unwrap_or_default()
             .into();
 
-        response.version = parts[2];
+        response.version = parts.last().unwrap();
         let mut path = config.server.root.join(location.split('?').next().unwrap());
 
         path = match path.canonicalize() {
