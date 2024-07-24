@@ -233,24 +233,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
     ))
     .await?;
 
-    loop {
-        let (mut stream, addr) = listener.accept().await?;
+    let _allowlist = CONFIG.clone().allowlist;
+    let _blocklist = CONFIG.clone().blocklist;
 
-        if (cfg!(feature = "allow_ip")
-            && !CONFIG
-                .clone()
-                .allowlist
-                .unwrap_or_default()
-                .contains(&addr.ip()))
-            || (cfg!(feature = "block_ip")
-                && CONFIG
-                    .clone()
-                    .blocklist
-                    .unwrap_or_default()
-                    .contains(&addr.ip()))
-        {
-            stream.shutdown().await?;
-            continue;
+    loop {
+        #[allow(unused_mut)]
+        let (mut stream, _addr) = listener.accept().await?;
+
+        if let Some(ref allowlist) = _allowlist {
+            if !allowlist.contains(&_addr.ip()) {
+                stream.shutdown().await?;
+                continue;
+            }
+        }
+
+        if let Some(ref blocklist) = _blocklist {
+            if blocklist.contains(&_addr.ip()) {
+                stream.shutdown().await?;
+                continue;
+            }
         }
 
         tokio::spawn(async move {
@@ -264,7 +265,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     _ => log::Level::Warn,
                 };
 
-                log!(log_level, "\"{}\" {} - {}", _req, _status_code, addr);
+                log!(log_level, "\"{}\" {} - {}", _req, _status_code, _addr);
             }
         });
     }

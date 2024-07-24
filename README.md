@@ -8,8 +8,6 @@
 
 `lru_cache`: cache the pages for better performance
 
-`allow_ip` & `block_ip`: enable for allowing ip or blocking ip
-
 **Configuration** 
 
 
@@ -25,10 +23,10 @@ server:
   index: index.html # optional
   error_page: 404.html # optional
 
-allowlist: # requires feature "allow_ip"
+allowlist:
   - 127.0.0.1
 
-blocklist: # requires feature "block_ip"
+blocklist:
   - 114.114.114.114
 ```
 
