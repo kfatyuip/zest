@@ -20,14 +20,18 @@ server:
   info: "Powered by Rust"
   root: .
   auto_index: false # optional
-  index: index.html # optional
+  index: None # optional
   error_page: 404.html # optional
 
-allowlist:
+allowlist: # optional
   - 127.0.0.1
 
-blocklist:
+blocklist: # optional
   - 114.114.114.114
+
+logging: # optional
+  access_log: /var/log/tsr/access.log
+  error_log: /var/log/tsr/error.log
 ```
 
 **Benchmark (wrk)**

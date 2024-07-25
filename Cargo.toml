@@ -11,19 +11,19 @@ strip = "symbols"
 lto = true
 
 [features]
-default = ["index_sort", "log"]
+default = ["index_sort", "log", "ip_limit"]
 index_sort = []
 lru_cache = ["dep:lru"]
 ip_limit = []
-log = ["dep:log", "dep:env_logger"]
+log = ["dep:log"]
 
 [dependencies]
 async-mutex = "1.4.0"
 chrono = { version = "0.4.38", features = ["clock", "now"] }
 clap = { version = "4.5.7", features = ["derive"] }
-env_logger = { version = "0.11.3", features = ["color"], optional = true }
 lazy_static = "1.5.0"
 log = { version = "0.4.21", optional = true }
+log4rs = "1.3.0"
 lru = { version = "0.12.3", optional = true }
 mime = { version = "0.3.17" }
 mime_guess = { version = "2.0.4" }

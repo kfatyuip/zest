@@ -6,7 +6,7 @@ use tsr::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use mime::Mime;
-use std::{collections::HashMap, env, error::Error, io, ops::Deref, path::Path};
+use std::{collections::HashMap, env, error::Error, io, net::IpAddr, ops::Deref, path::Path};
 
 #[cfg(feature = "log")]
 use log::log;
@@ -35,6 +35,9 @@ use tokio::{
 };
 
 const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
+
+#[cfg(feature = "log")]
+const LOG_FORMAT: &str = "[{d(%Y-%m-%dT%H:%M:%SZ)} {h({l})}  tsr] {m}\n";
 
 #[cfg(feature = "lru_cache")]
 lazy_static! {
@@ -215,42 +218,120 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    #[cfg(feature = "log")]
-    {
-        if !log::log_enabled!(log::Level::Info) {
-            env::set_var("RUST_LOG", "info");
-        }
-        env_logger::init();
-    }
-
     let arg = Args::parse();
     *CONFIG_PATH.lock()? = arg.config.unwrap_or(String::new());
+    let config = CONFIG.deref();
+
+    #[cfg(feature = "log")]
+    {
+        use log4rs::{
+            append::{console::ConsoleAppender, file::FileAppender},
+            config::{Appender, Logger, Root},
+            encode::pattern::PatternEncoder,
+            Config,
+        };
+
+        let mut builder = Config::builder()
+            .logger(Logger::builder().build("info", log::LevelFilter::Info))
+            .logger(Logger::builder().build("error", log::LevelFilter::Error));
+
+        let stdout = ConsoleAppender::builder()
+            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+            .target(log4rs::append::console::Target::Stdout)
+            .build();
+
+        let stderr = ConsoleAppender::builder()
+            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+            .target(log4rs::append::console::Target::Stderr)
+            .build();
+
+        if let Some(logging) = &config.logging {
+            builder = if let Some(access_log) = &logging.access_log {
+                let access_log_path = Path::new(&access_log);
+                std::fs::File::create(access_log_path).unwrap();
+                builder.appender(
+                    Appender::builder().build(
+                        "logfile_access",
+                        Box::new(
+                            FileAppender::builder()
+                                .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+                                .build(access_log_path)
+                                .unwrap(),
+                        ),
+                    ),
+                )
+            } else {
+                builder.appender(Appender::builder().build("logfile_access", Box::new(stdout)))
+            };
+            builder = if let Some(error_log) = &logging.error_log {
+                let error_log_path = Path::new(&error_log);
+                std::fs::File::create(error_log_path).unwrap();
+                builder.appender(
+                    Appender::builder().build(
+                        "logfile_error",
+                        Box::new(
+                            FileAppender::builder()
+                                .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+                                .build(Path::new(&error_log))
+                                .unwrap(),
+                        ),
+                    ),
+                )
+            } else {
+                builder.appender(Appender::builder().build("logfile_error", Box::new(stderr)))
+            }
+        } else {
+            builder = builder
+                .appender(Appender::builder().build("logfile_access", Box::new(stdout)))
+                .appender(Appender::builder().build("logfile_error", Box::new(stderr)));
+        }
+
+        let config = builder
+            .build(
+                Root::builder()
+                    .appender("logfile_access")
+                    .appender("logfile_error")
+                    .build(log::LevelFilter::Info),
+            )
+            .unwrap();
+
+        log4rs::init_config(config).unwrap();
+    }
 
     let listener = TcpListener::bind(format!(
         "{}:{}",
-        CONFIG.bind.addr,
-        arg.port.unwrap_or(CONFIG.bind.listen)
+        config.bind.addr,
+        arg.port.unwrap_or(config.bind.listen)
     ))
     .await?;
 
-    let _allowlist = CONFIG.clone().allowlist;
-    let _blocklist = CONFIG.clone().blocklist;
+    let mut _allowlist: Option<Vec<IpAddr>>;
+    let mut _blocklist: Option<Vec<IpAddr>>;
+
+    #[cfg(feature = "ip_limit")]
+    {
+        _allowlist = config.clone().allowlist;
+        _blocklist = config.clone().blocklist;
+    }
 
     loop {
         #[allow(unused_mut)]
         let (mut stream, _addr) = listener.accept().await?;
 
-        if let Some(ref allowlist) = _allowlist {
-            if !allowlist.contains(&_addr.ip()) {
-                stream.shutdown().await?;
-                continue;
+        #[cfg(feature = "ip_limit")]
+        {
+            if let Some(ref allowlist) = _allowlist {
+                if !allowlist.contains(&_addr.ip()) {
+                    stream.shutdown().await?;
+                    continue;
+                }
             }
-        }
 
-        if let Some(ref blocklist) = _blocklist {
-            if blocklist.contains(&_addr.ip()) {
-                stream.shutdown().await?;
-                continue;
+            if let Some(ref blocklist) = _blocklist {
+                if blocklist.contains(&_addr.ip()) {
+                    stream.shutdown().await?;
+                    continue;
+                }
             }
         }
 

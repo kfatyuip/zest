@@ -8,6 +8,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub allowlist: Option<Vec<IpAddr>>,
     pub blocklist: Option<Vec<IpAddr>>,
+    pub logging: Option<LoggingConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -23,6 +24,12 @@ pub struct ServerConfig {
     pub auto_index: Option<bool>,
     pub index: Option<PathBuf>,
     pub error_page: Option<PathBuf>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LoggingConfig {
+    pub access_log: Option<String>,
+    pub error_log: Option<String>,
 }
 
 lazy_static! {
@@ -46,6 +53,7 @@ fn init_config() -> Config {
         },
         allowlist: None,
         blocklist: None,
+        logging: None,
     };
 
     match fs::read_to_string(config_path.to_owned()) {
