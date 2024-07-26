@@ -31,7 +31,7 @@ use {
 use tokio::{
     fs::File,
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
 };
 
 const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
@@ -87,7 +87,10 @@ impl<'a> Response<'a> {
     }
 }
 
-async fn handle_connection(mut stream: TcpStream) -> io::Result<(i32, String)> {
+async fn handle_connection<S>(mut stream: S) -> io::Result<(i32, String)>
+where
+    S: AsyncReadExt + AsyncWriteExt + Unpin,
+{
     let config = CONFIG.deref();
 
     let mut response: Response = Response {
@@ -290,7 +293,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .build(
                 Root::builder()
                     .appender("logfile_access")
-                    .appender("logfile_error")
                     .build(log::LevelFilter::Info),
             )
             .unwrap();

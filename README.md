@@ -6,6 +6,8 @@
 
 `index_sort`: sort files and directories like python http.server (enabled by default)
 
+`ip_limit`: ip allowlist and ip blocklist (enabled by default)
+
 `lru_cache`: cache the pages for better performance
 
 **Configuration** 
