@@ -12,7 +12,6 @@
 
 **Configuration** 
 
-
 ```yaml
 bind:
   addr: 127.0.0.1
@@ -40,6 +39,7 @@ logging: # optional
 ```
 
 **Benchmark (wrk)**
+
 ```text
 kfatyuip@archlinux [19:32:18] [~/tsr] [main]
 -> % time wrk http://localhost:8080 -t 4 -d 10s # cargo run --no-default-features --features=lru_cache --release
@@ -50,7 +50,7 @@ Running 10s test @ http://localhost:8080
     Req/Sec     3.84k   188.99     4.67k    72.21%
   153835 requests in 10.10s, 121.91MB read
   Socket errors: connect 0, read 153829, write 0, timeout 0
-Requests/sec:  15231.82
+Requests/sec:     15231.82
 Transfer/sec:     12.07MB
 wrk http://localhost:8080 -t 4 -d 10s  1.41s user 10.96s system 122% cpu 10.109 total
 
