@@ -6,10 +6,12 @@ use tsr::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use mime::Mime;
-use std::{collections::HashMap, env, error::Error, io, net::IpAddr, ops::Deref, path::Path};
+use std::{
+    collections::HashMap, env, error::Error, io, net::IpAddr, ops::Deref, path::Path, sync::Arc,
+};
 
 #[cfg(feature = "log")]
-use log::log;
+use log::logger;
 
 #[macro_use]
 #[cfg(feature = "lru_cache")]
@@ -32,6 +34,7 @@ use tokio::{
     fs::File,
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
+    sync::Semaphore,
 };
 
 const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
@@ -234,9 +237,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Config,
         };
 
-        let mut builder = Config::builder()
-            .logger(Logger::builder().build("info", log::LevelFilter::Info))
-            .logger(Logger::builder().build("error", log::LevelFilter::Error));
+        let mut builder = Config::builder();
 
         let stdout = ConsoleAppender::builder()
             .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
@@ -266,6 +267,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 builder.appender(Appender::builder().build("logfile_access", Box::new(stdout)))
             };
+
             builder = if let Some(error_log) = &logging.error_log {
                 let error_log_path = Path::new(&error_log);
                 std::fs::File::create(error_log_path).unwrap();
@@ -275,7 +277,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         Box::new(
                             FileAppender::builder()
                                 .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-                                .build(Path::new(&error_log))
+                                .build(error_log_path)
                                 .unwrap(),
                         ),
                     ),
@@ -290,11 +292,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         let config = builder
-            .build(
-                Root::builder()
+            .logger(
+                Logger::builder()
                     .appender("logfile_access")
-                    .build(log::LevelFilter::Info),
+                    .additive(false)
+                    .build("access", log::LevelFilter::Info),
             )
+            .logger(
+                Logger::builder()
+                    .appender("logfile_error")
+                    .additive(false)
+                    .build("error", log::LevelFilter::Error),
+            )
+            .build(Root::builder().build(log::LevelFilter::Off))
             .unwrap();
 
         log4rs::init_config(config).unwrap();
@@ -307,14 +317,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     ))
     .await?;
 
-    let mut _allowlist: Option<Vec<IpAddr>>;
-    let mut _blocklist: Option<Vec<IpAddr>>;
+    let mut _allowlist: Option<Vec<IpAddr>> = config.clone().allowlist;
+    let mut _blocklist: Option<Vec<IpAddr>> = config.clone().blocklist;
 
-    #[cfg(feature = "ip_limit")]
-    {
-        _allowlist = config.clone().allowlist;
-        _blocklist = config.clone().blocklist;
-    }
+    let rate_limiter = Arc::new(if let Some(rate_limit) = &config.rate_limit {
+        Semaphore::new(rate_limit.max_requests)
+    } else {
+        Semaphore::new(Semaphore::MAX_PERMITS)
+    });
 
     loop {
         #[allow(unused_mut)]
@@ -337,18 +347,45 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
+        let rate_limiter = Arc::clone(&rate_limiter);
         tokio::spawn(async move {
-            let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
+            if rate_limiter.clone().try_acquire_owned().is_ok() {
+                let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
 
-            #[cfg(feature = "log")]
-            {
-                let log_level: log::Level = match _status_code {
-                    200 => log::Level::Info,
-                    400.. => log::Level::Error,
-                    _ => log::Level::Warn,
-                };
-
-                log!(log_level, "\"{}\" {} - {}", _req, _status_code, _addr);
+                #[cfg(feature = "log")]
+                {
+                    match _status_code {
+                        200 => {
+                            logger().log(
+                                &log::Record::builder()
+                                    .level(log::Level::Info)
+                                    .target("access")
+                                    .args(format_args!("\"{}\" {} - {}", _req, _status_code, _addr))
+                                    .build(),
+                            );
+                        }
+                        400.. => {
+                            logger().log(
+                                &log::Record::builder()
+                                    .level(log::Level::Error)
+                                    .target("error")
+                                    .args(format_args!("\"{}\" {} - {}", _req, _status_code, _addr))
+                                    .build(),
+                            );
+                        }
+                        _ => {
+                            logger().log(
+                                &log::Record::builder()
+                                    .level(log::Level::Warn)
+                                    .target("access")
+                                    .args(format_args!("\"{}\" {} - {}", _req, _status_code, _addr))
+                                    .build(),
+                            );
+                        }
+                    };
+                }
+            } else {
+                let _ = stream.shutdown().await;
             }
         });
     }

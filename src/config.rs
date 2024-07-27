@@ -8,6 +8,7 @@ pub struct Config {
     pub server: ServerConfig,
     pub allowlist: Option<Vec<IpAddr>>,
     pub blocklist: Option<Vec<IpAddr>>,
+    pub rate_limit: Option<RateLimitConfig>,
     pub logging: Option<LoggingConfig>,
 }
 
@@ -24,6 +25,11 @@ pub struct ServerConfig {
     pub auto_index: Option<bool>,
     pub index: Option<PathBuf>,
     pub error_page: Option<PathBuf>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RateLimitConfig {
+    pub max_requests: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -53,6 +59,7 @@ fn init_config() -> Config {
         },
         allowlist: None,
         blocklist: None,
+        rate_limit: None,
         logging: None,
     };
 

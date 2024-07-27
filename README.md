@@ -31,6 +31,9 @@ allowlist: # optional
 blocklist: # optional
   - 114.114.114.114
 
+rate_limit: # optional
+  max_requests: 1024
+
 logging: # optional
   access_log: /var/log/tsr/access.log
   error_log: /var/log/tsr/error.log
