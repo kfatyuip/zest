@@ -1,13 +1,13 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{env::current_dir, fs, net::IpAddr, path::PathBuf, sync::Mutex};
+use std::{env::current_dir, fs, path::PathBuf, sync::Mutex};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub bind: BindConfig,
     pub server: ServerConfig,
-    pub allowlist: Option<Vec<IpAddr>>,
-    pub blocklist: Option<Vec<IpAddr>>,
+    pub allowlist: Option<Vec<String>>,
+    pub blocklist: Option<Vec<String>>,
     pub rate_limit: Option<RateLimitConfig>,
     pub logging: Option<LoggingConfig>,
 }

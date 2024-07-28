@@ -28,7 +28,7 @@ allowlist: # optional
   - 127.0.0.1
 
 blocklist: # optional
-  - 114.114.114.114
+  - 192.168.0.1/24
 
 rate_limit: # optional
   max_requests: 1024

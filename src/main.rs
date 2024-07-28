@@ -6,9 +6,7 @@ use tsr::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use mime::Mime;
-use std::{
-    collections::HashMap, env, error::Error, io, net::IpAddr, ops::Deref, path::Path, sync::Arc,
-};
+use std::{collections::HashMap, env, error::Error, io, ops::Deref, path::Path, sync::Arc};
 
 #[cfg(feature = "log")]
 use log::logger;
@@ -317,8 +315,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     ))
     .await?;
 
-    let mut _allowlist: Option<Vec<IpAddr>> = config.clone().allowlist;
-    let mut _blocklist: Option<Vec<IpAddr>> = config.clone().blocklist;
+    let mut _allowlist: Option<Vec<String>> = config.clone().allowlist;
+    let mut _blocklist: Option<Vec<String>> = config.clone().blocklist;
 
     let rate_limiter = Arc::new(if let Some(rate_limit) = &config.rate_limit {
         Semaphore::new(rate_limit.max_requests)
@@ -326,23 +324,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Semaphore::new(Semaphore::MAX_PERMITS)
     });
 
-    loop {
+    'handle: loop {
         #[allow(unused_mut)]
         let (mut stream, _addr) = listener.accept().await?;
 
         #[cfg(feature = "ip_limit")]
         {
             if let Some(ref allowlist) = _allowlist {
-                if !allowlist.contains(&_addr.ip()) {
-                    stream.shutdown().await?;
-                    continue;
+                for item in allowlist {
+                    if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
+                        if !cidr.contains(&_addr.ip()) {
+                            if allowlist.last() != Some(item) {
+                                continue;
+                            } else {
+                                stream.shutdown().await?;
+                                continue 'handle;
+                            }
+                        }
+                    }
                 }
             }
 
             if let Some(ref blocklist) = _blocklist {
-                if blocklist.contains(&_addr.ip()) {
-                    stream.shutdown().await?;
-                    continue;
+                for item in blocklist {
+                    if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
+                        if cidr.contains(&_addr.ip()) {
+                            stream.shutdown().await?;
+                            continue 'handle;
+                        }
+                    }
                 }
             }
         }

@@ -367,6 +367,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipnet"
+version = "2.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -916,6 +922,7 @@ dependencies = [
  "async-mutex",
  "chrono",
  "clap",
+ "ipnet",
  "lazy_static",
  "log",
  "log4rs",
