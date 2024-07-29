@@ -6,7 +6,9 @@ use tsr::{
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use mime::Mime;
-use std::{collections::HashMap, env, error::Error, io, ops::Deref, path::Path, sync::Arc};
+use std::{
+    collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path, sync::Arc,
+};
 
 #[cfg(feature = "log")]
 use log::logger;
@@ -145,11 +147,7 @@ where
                     .unwrap_or_default()
             }
         };
-        if !config.server.auto_index.unwrap_or(false)
-            && !path.starts_with(config.server.root.canonicalize().unwrap())
-        {
-            response.status_code = 301;
-        } else if path.is_dir() {
+        if path.is_dir() {
             #[allow(unused_assignments)]
             let mut html: String = String::new();
             #[cfg(feature = "lru_cache")]
@@ -157,17 +155,23 @@ where
                 let mut cache = CACHE.lock().await;
                 if let Some(ctx) = cache.get(&location) {
                     html.clone_from(ctx);
-                } else {
+                } else if let Ok(index) = location_index(path, &location).await {
                     cache
-                        .push(location.clone(), location_index(path, &location).await?)
+                        .push(location.clone(), index)
                         .to_owned()
                         .unwrap_or_default();
                     html.clone_from(cache.get(&location).unwrap());
+                } else {
+                    response.status_code = 301;
                 }
             }
             #[cfg(not(feature = "lru_cache"))]
             {
-                html = location_index(path, &location).await?;
+                if let Ok(index) = location_index(path, &location).await {
+                    html = index;
+                } else {
+                    response.status_code = 301;
+                }
             }
 
             buffer = html.into_bytes();
@@ -225,6 +229,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let arg = Args::parse();
     *CONFIG_PATH.lock()? = arg.config.unwrap_or(String::new());
     let config = CONFIG.deref();
+
+    set_current_dir(config.clone().server.root)?;
 
     #[cfg(feature = "log")]
     {

@@ -1,17 +1,33 @@
-use crate::config::CONFIG;
+use crate::config::{LocationConfig, CONFIG};
+use serde_yml::from_value;
 use std::{
-    env::current_dir,
     fmt::Write,
-    io::Result,
+    io::{ErrorKind, Result},
+    ops::Deref,
     path::{Path, PathBuf},
 };
 use tokio::fs::{self, read_dir, DirEntry};
 
 #[inline]
 pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
-    if path == current_dir()? {
-        if let Some(index) = &CONFIG.server.index {
-            return fs::read_to_string(index.clone()).await;
+    let config = CONFIG.deref();
+
+    if let Some(locatons) = &config.locations {
+        for (s, v) in locatons {
+            if s.trim_start_matches('/') == location {
+                match from_value::<LocationConfig>(v.clone()) {
+                    Ok(_location) => {
+                        if let Some(index) = _location.index {
+                            return fs::read_to_string(index.clone()).await;
+                        } else if _location.auto_index.is_none() || !_location.auto_index.unwrap() {
+                            return Err(ErrorKind::Unsupported.into());
+                        }
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
+            }
         }
     }
 

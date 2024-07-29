@@ -20,8 +20,6 @@ bind:
 server:
   info: "Powered by Rust"
   root: .
-  auto_index: false # optional
-  index: None # optional
   error_page: 404.html # optional
 
 allowlist: # optional
@@ -32,6 +30,11 @@ blocklist: # optional
 
 rate_limit: # optional
   max_requests: 1024
+
+locations: # optional
+  /:
+    auto_index: false
+    index: index.html
 
 logging: # optional
   access_log: /var/log/tsr/access.log

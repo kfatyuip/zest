@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{env::current_dir, fs, path::PathBuf, sync::Mutex};
+use serde_yml::Value;
+use std::{collections::HashMap, env::current_dir, fs, path::PathBuf, sync::Mutex};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -9,6 +10,7 @@ pub struct Config {
     pub allowlist: Option<Vec<String>>,
     pub blocklist: Option<Vec<String>>,
     pub rate_limit: Option<RateLimitConfig>,
+    pub locations: Option<HashMap<String, Value>>,
     pub logging: Option<LoggingConfig>,
 }
 
@@ -22,14 +24,18 @@ pub struct BindConfig {
 pub struct ServerConfig {
     pub info: String,
     pub root: PathBuf,
-    pub auto_index: Option<bool>,
-    pub index: Option<PathBuf>,
     pub error_page: Option<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RateLimitConfig {
     pub max_requests: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct LocationConfig {
+    pub auto_index: Option<bool>,
+    pub index: Option<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -48,13 +54,12 @@ impl Default for Config {
             server: ServerConfig {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap_or(".".into()),
-                auto_index: Some(false),
-                index: None,
                 error_page: Some("404.html".to_owned().into()),
             },
             allowlist: None,
             blocklist: None,
             rate_limit: None,
+            locations: None,
             logging: None,
         }
     }
