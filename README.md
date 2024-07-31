@@ -44,18 +44,18 @@ logging: # optional
 **Benchmark (wrk)**
 
 ```text
-kfatyuip@archlinux [19:32:18] [~/tsr] [main]
--> % time wrk http://localhost:8080 -t 4 -d 10s # cargo run --no-default-features --features=lru_cache --release
-Running 10s test @ http://localhost:8080
+kfatyuip@archlinux [21:05:44] [~] 
+-> % time wrk http://localhost:8080/ -t 4 -d 10s # cargo run --release --no-default-features --features=lru_cache -- -p 8080
+Running 10s test @ http://localhost:8080/
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   366.46us  157.63us   3.69ms   73.90%
-    Req/Sec     3.84k   188.99     4.67k    72.21%
-  153835 requests in 10.10s, 121.91MB read
-  Socket errors: connect 0, read 153829, write 0, timeout 0
-Requests/sec:     15231.82
-Transfer/sec:     12.07MB
-wrk http://localhost:8080 -t 4 -d 10s  1.41s user 10.96s system 122% cpu 10.109 total
+    Latency   358.01us  151.88us   2.57ms   72.96%
+    Req/Sec     3.88k   171.86     5.04k    79.90%
+  155645 requests in 10.10s, 117.86MB read
+  Socket errors: connect 0, read 155644, write 0, timeout 0
+Requests/sec:  15410.34
+Transfer/sec:     11.67MB
+wrk http://localhost:8080/ -t 4 -d 10s  1.51s user 11.11s system 124% cpu 10.109 total
 
 kfatyuip@archlinux [22:45:30] [~/tsr] [main]
 -> % time wrk http://localhost:8080 -t 4 -d 10s # python -m http.server 8080

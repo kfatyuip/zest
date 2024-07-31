@@ -13,10 +13,6 @@ use std::{
 #[cfg(feature = "log")]
 use log::logger;
 
-#[macro_use]
-#[cfg(feature = "lru_cache")]
-extern crate lazy_static;
-
 #[cfg(target_os = "android")]
 use std::os::android::fs::MetadataExt;
 
@@ -26,6 +22,7 @@ use std::os::linux::fs::MetadataExt;
 #[cfg(feature = "lru_cache")]
 use {
     async_mutex::Mutex, // faster than tokio::sync::Mutex
+    lazy_static::lazy_static,
     lru::LruCache,
     std::num::NonZeroUsize,
 };
@@ -330,6 +327,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Semaphore::new(Semaphore::MAX_PERMITS)
     });
 
+    #[allow(unused_labels)]
     'handle: loop {
         #[allow(unused_mut)]
         let (mut stream, _addr) = listener.accept().await?;
