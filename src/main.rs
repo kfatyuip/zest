@@ -1,6 +1,6 @@
 use tsr::{
     config::{CONFIG, CONFIG_PATH},
-    route::{location_index, mime_match, status_page},
+    route::{location_index, mime_match, root_relative, status_page},
 };
 
 use chrono::{DateTime, Utc};
@@ -118,7 +118,7 @@ where
     } else if parts.first().unwrap().trim() != "GET" {
         response.status_code = 501;
     } else if let Some(location) = &req.split_whitespace().nth(1) {
-        let location: String = urlencoding::decode(location.trim_start_matches('/'))
+        let location: String = urlencoding::decode(root_relative(location))
             .unwrap_or_default()
             .into();
 
