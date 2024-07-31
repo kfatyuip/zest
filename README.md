@@ -42,10 +42,8 @@ logging: # optional
 ```
 
 **Benchmark (wrk)**
-
++ cargo run --release --no-default-features --features=lru_cache -- -p 8080
 ```text
-kfatyuip@archlinux [21:05:44] [~] 
--> % time wrk http://localhost:8080/ -t 4 -d 10s # cargo run --release --no-default-features --features=lru_cache -- -p 8080
 Running 10s test @ http://localhost:8080/
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
@@ -56,9 +54,10 @@ Running 10s test @ http://localhost:8080/
 Requests/sec:  15410.34
 Transfer/sec:     11.67MB
 wrk http://localhost:8080/ -t 4 -d 10s  1.51s user 11.11s system 124% cpu 10.109 total
+```
 
-kfatyuip@archlinux [22:45:30] [~/tsr] [main]
--> % time wrk http://localhost:8080 -t 4 -d 10s # python -m http.server 8080
++ python -m http.server 8080
+```text
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
@@ -68,9 +67,9 @@ Running 10s test @ http://localhost:8080
 Requests/sec:    974.16
 Transfer/sec:    709.69KB
 wrk http://localhost:8080 -t 4 -d 10s  0.16s user 0.87s system 10% cpu 10.021 total
-
-kfatyuip@archlinux [22:45:48] [~/tsr] [main]
--> % time wrk http://localhost:8080 -t 4 -d 10s # nginx
+```
++ nginx
+```text
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
@@ -78,6 +77,6 @@ Running 10s test @ http://localhost:8080
     Req/Sec     4.80k   419.58     6.00k    64.60%
   193247 requests in 10.10s, 157.20MB read
 Requests/sec:    19134.09
-Transfer/sec:    15.57MB
+Transfer/sec:       15.57MB
 wrk http://localhost:8080 -t 4 -d 10s  1.24s user 4.41s system 55% cpu 10.107 total
 ```
