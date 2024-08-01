@@ -1,10 +1,9 @@
-use tsr::{
-    config::{CONFIG, CONFIG_PATH},
+use zest::{
+    config::{Config, ARGS, CONFIG, CONFIG_PATH},
     route::{location_index, mime_match, root_relative, status_page},
 };
 
 use chrono::{DateTime, Utc};
-use clap::Parser;
 use mime::Mime;
 use std::{
     collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path, sync::Arc,
@@ -37,7 +36,7 @@ use tokio::{
 const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 #[cfg(feature = "log")]
-const LOG_FORMAT: &str = "[{d(%Y-%m-%dT%H:%M:%SZ)} {h({l})}  tsr] {m}\n";
+const LOG_FORMAT: &str = "[{d(%Y-%m-%dT%H:%M:%SZ)} {h({l})}  zest] {m}\n";
 
 #[cfg(feature = "lru_cache")]
 lazy_static! {
@@ -99,7 +98,11 @@ where
         _headers_buffer: HashMap::new(),
     };
 
-    let server_info = format!("TSR/{} ({})", env!("CARGO_PKG_VERSION"), config.server.info);
+    let server_info = format!(
+        "Zest/{} ({})",
+        env!("CARGO_PKG_VERSION"),
+        config.server.info
+    );
     response.send_header("Server", server_info.clone());
 
     response.send_header("Date", Utc::now().format(DATE_FORMAT));
@@ -211,112 +214,100 @@ where
     Ok((response.status_code, req))
 }
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[arg(short, long, default_value = None, help = "set config file path")]
-    config: Option<String>,
+#[inline]
+fn init_logger(config: Config) {
+    use log4rs::{
+        append::{console::ConsoleAppender, file::FileAppender},
+        config::{Appender, Logger, Root},
+        encode::pattern::PatternEncoder,
+        Config,
+    };
 
-    #[arg(short, long, default_value = None, help = "set the listening port")]
-    port: Option<i32>,
+    let mut builder = Config::builder();
+
+    let stdout = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+        .target(log4rs::append::console::Target::Stdout)
+        .build();
+
+    let stderr = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+        .target(log4rs::append::console::Target::Stderr)
+        .build();
+
+    if let Some(logging) = &config.logging {
+        builder = if let Some(access_log) = &logging.access_log {
+            let access_log_path = Path::new(&access_log);
+            std::fs::File::create(access_log_path).unwrap();
+            builder.appender(
+                Appender::builder().build(
+                    "logfile_access",
+                    Box::new(
+                        FileAppender::builder()
+                            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+                            .build(access_log_path)
+                            .unwrap(),
+                    ),
+                ),
+            )
+        } else {
+            builder.appender(Appender::builder().build("logfile_access", Box::new(stdout)))
+        };
+
+        builder = if let Some(error_log) = &logging.error_log {
+            let error_log_path = Path::new(&error_log);
+            std::fs::File::create(error_log_path).unwrap();
+            builder.appender(
+                Appender::builder().build(
+                    "logfile_error",
+                    Box::new(
+                        FileAppender::builder()
+                            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+                            .build(error_log_path)
+                            .unwrap(),
+                    ),
+                ),
+            )
+        } else {
+            builder.appender(Appender::builder().build("logfile_error", Box::new(stderr)))
+        }
+    } else {
+        builder = builder
+            .appender(Appender::builder().build("logfile_access", Box::new(stdout)))
+            .appender(Appender::builder().build("logfile_error", Box::new(stderr)));
+    }
+
+    let config = builder
+        .logger(
+            Logger::builder()
+                .appender("logfile_access")
+                .additive(false)
+                .build("access", log::LevelFilter::Info),
+        )
+        .logger(
+            Logger::builder()
+                .appender("logfile_error")
+                .additive(false)
+                .build("error", log::LevelFilter::Error),
+        )
+        .build(Root::builder().build(log::LevelFilter::Off))
+        .unwrap();
+
+    log4rs::init_config(config).unwrap();
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let arg = Args::parse();
-    *CONFIG_PATH.lock()? = arg.config.unwrap_or(String::new());
+    *CONFIG_PATH.lock()? = ARGS.config.clone().unwrap_or_default();
     let config = CONFIG.deref();
 
     set_current_dir(config.clone().server.root)?;
 
     #[cfg(feature = "log")]
-    {
-        use log4rs::{
-            append::{console::ConsoleAppender, file::FileAppender},
-            config::{Appender, Logger, Root},
-            encode::pattern::PatternEncoder,
-            Config,
-        };
+    init_logger(config.clone());
 
-        let mut builder = Config::builder();
-
-        let stdout = ConsoleAppender::builder()
-            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-            .target(log4rs::append::console::Target::Stdout)
-            .build();
-
-        let stderr = ConsoleAppender::builder()
-            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-            .target(log4rs::append::console::Target::Stderr)
-            .build();
-
-        if let Some(logging) = &config.logging {
-            builder = if let Some(access_log) = &logging.access_log {
-                let access_log_path = Path::new(&access_log);
-                std::fs::File::create(access_log_path).unwrap();
-                builder.appender(
-                    Appender::builder().build(
-                        "logfile_access",
-                        Box::new(
-                            FileAppender::builder()
-                                .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-                                .build(access_log_path)
-                                .unwrap(),
-                        ),
-                    ),
-                )
-            } else {
-                builder.appender(Appender::builder().build("logfile_access", Box::new(stdout)))
-            };
-
-            builder = if let Some(error_log) = &logging.error_log {
-                let error_log_path = Path::new(&error_log);
-                std::fs::File::create(error_log_path).unwrap();
-                builder.appender(
-                    Appender::builder().build(
-                        "logfile_error",
-                        Box::new(
-                            FileAppender::builder()
-                                .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-                                .build(error_log_path)
-                                .unwrap(),
-                        ),
-                    ),
-                )
-            } else {
-                builder.appender(Appender::builder().build("logfile_error", Box::new(stderr)))
-            }
-        } else {
-            builder = builder
-                .appender(Appender::builder().build("logfile_access", Box::new(stdout)))
-                .appender(Appender::builder().build("logfile_error", Box::new(stderr)));
-        }
-
-        let config = builder
-            .logger(
-                Logger::builder()
-                    .appender("logfile_access")
-                    .additive(false)
-                    .build("access", log::LevelFilter::Info),
-            )
-            .logger(
-                Logger::builder()
-                    .appender("logfile_error")
-                    .additive(false)
-                    .build("error", log::LevelFilter::Error),
-            )
-            .build(Root::builder().build(log::LevelFilter::Off))
-            .unwrap();
-
-        log4rs::init_config(config).unwrap();
-    }
-
-    let listener = TcpListener::bind(format!(
-        "{}:{}",
-        config.bind.addr,
-        arg.port.unwrap_or(config.bind.listen)
-    ))
-    .await?;
+    let listener =
+        TcpListener::bind(format!("{}:{}", config.bind.addr, config.bind.listen)).await?;
 
     let mut _allowlist: Option<Vec<String>> = config.clone().allowlist;
     let mut _blocklist: Option<Vec<String>> = config.clone().blocklist;

@@ -1,4 +1,4 @@
-## Rusted HTTP Server [![Rust](https://github.com/kfatyuip/tsr/actions/workflows/rust.yml/badge.svg)](https://github.com/kfatyuip/tsr/actions/workflows/rust.yml)
+## Rusted HTTP Server [![Rust](https://github.com/kfatyuip/zest/actions/workflows/rust.yml/badge.svg)](https://github.com/kfatyuip/zest/actions/workflows/rust.yml)
 
 **Features**
 
@@ -37,8 +37,8 @@ locations: # optional
     index: index.html
 
 logging: # optional
-  access_log: /var/log/tsr/access.log
-  error_log: /var/log/tsr/error.log
+  access_log: /var/log/zest/access.log
+  error_log: /var/log/zest/error.log
 ```
 
 **Benchmark (wrk)**

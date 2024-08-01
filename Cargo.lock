@@ -873,26 +873,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tsr"
-version = "0.1.8"
-dependencies = [
- "async-mutex",
- "chrono",
- "clap",
- "ipnet",
- "lazy_static",
- "log",
- "log4rs",
- "lru",
- "mime",
- "mime_guess",
- "serde",
- "serde_yml",
- "tokio",
- "urlencoding",
-]
-
-[[package]]
 name = "typemap-ors"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1197,4 +1177,24 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.71",
+]
+
+[[package]]
+name = "zest"
+version = "0.1.8"
+dependencies = [
+ "async-mutex",
+ "chrono",
+ "clap",
+ "ipnet",
+ "lazy_static",
+ "log",
+ "log4rs",
+ "lru",
+ "mime",
+ "mime_guess",
+ "serde",
+ "serde_yml",
+ "tokio",
+ "urlencoding",
 ]
