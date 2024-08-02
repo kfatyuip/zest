@@ -21,6 +21,9 @@ server:
   info: "Powered by Rust"
   root: .
   error_page: 404.html # optional
+  cache: # optional
+    index_capacity: 16
+    file_capacity: 32
 
 allowlist: # optional
   - 127.0.0.1

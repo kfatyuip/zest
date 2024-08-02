@@ -17,27 +17,25 @@ pub fn root_relative(p: &str) -> &str {
 pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
     let config = CONFIG.deref();
 
-    if let Some(locations) = &config.locations {
-        for (s, v) in locations {
-            if root_relative(s) == location.trim_end_matches('/') {
-                match from_value::<LocationConfig>(v.clone()) {
-                    Ok(_location) => {
-                        if let Some(index) = _location.index {
-                            return fs::read_to_string(root_relative(
-                                PathBuf::from(location)
-                                    .join(index.clone())
-                                    .as_path()
-                                    .to_str()
-                                    .unwrap(),
-                            ))
-                            .await;
-                        } else if _location.auto_index.is_none() || !_location.auto_index.unwrap() {
-                            return Err(ErrorKind::Unsupported.into());
-                        }
+    for (s, v) in &config.locations.clone().unwrap_or_default() {
+        if root_relative(s) == location.trim_end_matches('/') {
+            match from_value::<LocationConfig>(v.clone()) {
+                Ok(_location) => {
+                    if let Some(index) = _location.index {
+                        return fs::read_to_string(root_relative(
+                            PathBuf::from(location)
+                                .join(index.clone())
+                                .as_path()
+                                .to_str()
+                                .unwrap(),
+                        ))
+                        .await;
+                    } else if _location.auto_index.is_none() || !_location.auto_index.unwrap() {
+                        return Err(ErrorKind::Unsupported.into());
                     }
-                    _ => {
-                        continue;
-                    }
+                }
+                _ => {
+                    continue;
                 }
             }
         }

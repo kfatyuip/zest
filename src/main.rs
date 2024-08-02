@@ -1,5 +1,5 @@
 use zest::{
-    config::{Config, ARGS, CONFIG, CONFIG_PATH},
+    config::{ARGS, CONFIG, CONFIG_PATH},
     route::{location_index, mime_match, root_relative, status_page},
 };
 
@@ -10,7 +10,14 @@ use std::{
 };
 
 #[cfg(feature = "log")]
-use log::logger;
+use {
+    log::logger,
+    log4rs::{
+        append::{console::ConsoleAppender, file::FileAppender},
+        config::{Appender, Logger, Root},
+        encode::pattern::PatternEncoder,
+    },
+};
 
 #[cfg(target_os = "android")]
 use std::os::android::fs::MetadataExt;
@@ -40,8 +47,34 @@ const LOG_FORMAT: &str = "[{d(%Y-%m-%dT%H:%M:%SZ)} {h({l})}  zest] {m}\n";
 
 #[cfg(feature = "lru_cache")]
 lazy_static! {
-    static ref CACHE: Mutex<LruCache<String, String>> = {
-        let cache = LruCache::new(NonZeroUsize::new(64).unwrap());
+    static ref INDEX_CACHE: Mutex<LruCache<String, String>> = {
+        let cache = LruCache::new(
+            NonZeroUsize::new(
+                CONFIG
+                    .server
+                    .cache
+                    .clone()
+                    .unwrap_or_default()
+                    .index_capacity
+                    .unwrap_or_default(),
+            )
+            .unwrap(),
+        );
+        Mutex::new(cache)
+    };
+    static ref FILE_CACHE: Mutex<LruCache<String, Vec<u8>>> = {
+        let cache = LruCache::new(
+            NonZeroUsize::new(
+                CONFIG
+                    .server
+                    .cache
+                    .clone()
+                    .unwrap_or_default()
+                    .file_capacity
+                    .unwrap_or_default(),
+            )
+            .unwrap(),
+        );
         Mutex::new(cache)
     };
 }
@@ -152,7 +185,7 @@ where
             let mut html: String = String::new();
             #[cfg(feature = "lru_cache")]
             {
-                let mut cache = CACHE.lock().await;
+                let mut cache = INDEX_CACHE.lock().await;
                 if let Some(ctx) = cache.get(&location) {
                     html.clone_from(ctx);
                 } else if let Ok(index) = location_index(path, &location).await {
@@ -181,6 +214,22 @@ where
                 Ok(f) => {
                     let mut file = f;
                     mime_type = mime_match(path.to_str().unwrap());
+
+                    #[cfg(feature = "lru_cache")]
+                    {
+                        let mut cache = FILE_CACHE.lock().await;
+                        if let Some(content) = cache.get(&location) {
+                            buffer = content.to_vec();
+                        } else {
+                            file.read_to_end(&mut buffer).await?;
+                            cache
+                                .push(location.clone(), buffer.clone())
+                                .to_owned()
+                                .unwrap_or_default();
+                        }
+                    }
+
+                    #[cfg(not(feature = "lru_cache"))]
                     file.read_to_end(&mut buffer).await?;
 
                     response.send_header(
@@ -215,15 +264,9 @@ where
 }
 
 #[inline]
-fn init_logger(config: Config) {
-    use log4rs::{
-        append::{console::ConsoleAppender, file::FileAppender},
-        config::{Appender, Logger, Root},
-        encode::pattern::PatternEncoder,
-        Config,
-    };
-
-    let mut builder = Config::builder();
+#[cfg(feature = "log")]
+fn init_logger(config: zest::config::Config) {
+    let mut builder = log4rs::Config::builder();
 
     let stdout = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
@@ -235,47 +278,42 @@ fn init_logger(config: Config) {
         .target(log4rs::append::console::Target::Stderr)
         .build();
 
-    if let Some(logging) = &config.logging {
-        builder = if let Some(access_log) = &logging.access_log {
-            let access_log_path = Path::new(&access_log);
-            std::fs::File::create(access_log_path).unwrap();
-            builder.appender(
-                Appender::builder().build(
-                    "logfile_access",
-                    Box::new(
-                        FileAppender::builder()
-                            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-                            .build(access_log_path)
-                            .unwrap(),
-                    ),
+    let logging = &config.logging.unwrap_or_default();
+    builder = if let Some(access_log) = &logging.access_log {
+        let access_log_path = Path::new(&access_log);
+        std::fs::File::create(access_log_path).unwrap();
+        builder.appender(
+            Appender::builder().build(
+                "logfile_access",
+                Box::new(
+                    FileAppender::builder()
+                        .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+                        .build(access_log_path)
+                        .unwrap(),
                 ),
-            )
-        } else {
-            builder.appender(Appender::builder().build("logfile_access", Box::new(stdout)))
-        };
-
-        builder = if let Some(error_log) = &logging.error_log {
-            let error_log_path = Path::new(&error_log);
-            std::fs::File::create(error_log_path).unwrap();
-            builder.appender(
-                Appender::builder().build(
-                    "logfile_error",
-                    Box::new(
-                        FileAppender::builder()
-                            .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
-                            .build(error_log_path)
-                            .unwrap(),
-                    ),
-                ),
-            )
-        } else {
-            builder.appender(Appender::builder().build("logfile_error", Box::new(stderr)))
-        }
+            ),
+        )
     } else {
-        builder = builder
-            .appender(Appender::builder().build("logfile_access", Box::new(stdout)))
-            .appender(Appender::builder().build("logfile_error", Box::new(stderr)));
-    }
+        builder.appender(Appender::builder().build("logfile_access", Box::new(stdout)))
+    };
+
+    builder = if let Some(error_log) = &logging.error_log {
+        let error_log_path = Path::new(&error_log);
+        std::fs::File::create(error_log_path).unwrap();
+        builder.appender(
+            Appender::builder().build(
+                "logfile_error",
+                Box::new(
+                    FileAppender::builder()
+                        .encoder(Box::new(PatternEncoder::new(LOG_FORMAT)))
+                        .build(error_log_path)
+                        .unwrap(),
+                ),
+            ),
+        )
+    } else {
+        builder.appender(Appender::builder().build("logfile_error", Box::new(stderr)))
+    };
 
     let config = builder
         .logger(

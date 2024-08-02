@@ -15,36 +15,6 @@ pub struct Config {
     pub logging: Option<LoggingConfig>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct BindConfig {
-    pub addr: String,
-    pub listen: i32,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ServerConfig {
-    pub info: String,
-    pub root: PathBuf,
-    pub error_page: Option<PathBuf>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct RateLimitConfig {
-    pub max_requests: usize,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct LocationConfig {
-    pub auto_index: Option<bool>,
-    pub index: Option<PathBuf>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct LoggingConfig {
-    pub access_log: Option<String>,
-    pub error_log: Option<String>,
-}
-
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -56,6 +26,7 @@ impl Default for Config {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap_or(".".into()),
                 error_page: Some("404.html".to_owned().into()),
+                cache: None,
             },
             allowlist: None,
             blocklist: None,
@@ -64,6 +35,52 @@ impl Default for Config {
             logging: None,
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct BindConfig {
+    pub addr: String,
+    pub listen: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ServerConfig {
+    pub info: String,
+    pub root: PathBuf,
+    pub error_page: Option<PathBuf>,
+    pub cache: Option<CacheConfig>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CacheConfig {
+    pub index_capacity: Option<usize>,
+    pub file_capacity: Option<usize>,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        CacheConfig {
+            index_capacity: Some(16),
+            file_capacity: Some(32),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RateLimitConfig {
+    pub max_requests: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct LocationConfig {
+    pub auto_index: Option<bool>,
+    pub index: Option<PathBuf>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct LoggingConfig {
+    pub access_log: Option<String>,
+    pub error_log: Option<String>,
 }
 
 #[derive(Parser)]
