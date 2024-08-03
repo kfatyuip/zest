@@ -1,6 +1,6 @@
 bind:
   addr: 0.0.0.0
-  listen: 80
+  listen: 8080
 
 server:
   info: "Powered by Rust"

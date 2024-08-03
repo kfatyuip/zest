@@ -3,7 +3,6 @@ use serde_yml::from_value;
 use std::{
     fmt::Write,
     io::{ErrorKind, Result},
-    ops::Deref,
     path::{Path, PathBuf},
 };
 use tokio::fs::{self, read_dir, DirEntry};
@@ -15,7 +14,7 @@ pub fn root_relative(p: &str) -> &str {
 
 #[inline]
 pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
-    let config = CONFIG.deref();
+    let config = CONFIG.try_read().unwrap();
 
     for (s, v) in &config.locations.clone().unwrap_or_default() {
         if root_relative(s) == location.trim_end_matches('/') {

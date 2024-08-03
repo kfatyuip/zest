@@ -1,3 +1,4 @@
+use async_rwlock::RwLock;
 use clap::{command, Parser};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -98,11 +99,12 @@ pub struct Args {
 
 lazy_static! {
     pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("".to_owned());
-    pub static ref CONFIG: Config = init_config();
+    pub static ref DEFAULT_CONFIG: Config = init_config();
+    pub static ref CONFIG: RwLock<Config> = RwLock::new((*DEFAULT_CONFIG).clone());
     pub static ref ARGS: Args = Args::parse();
 }
 
-fn init_config() -> Config {
+pub fn init_config() -> Config {
     let config_path = CONFIG_PATH.lock().unwrap();
     let default_config = Config::default();
     let mut config = match fs::read_to_string(config_path.to_owned()) {
