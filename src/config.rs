@@ -27,6 +27,7 @@ impl Default for Config {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap_or(".".into()),
                 error_page: Some("404.html".to_owned().into()),
+                tick: None,
                 cache: None,
             },
             allowlist: None,
@@ -49,6 +50,7 @@ pub struct ServerConfig {
     pub info: String,
     pub root: PathBuf,
     pub error_page: Option<PathBuf>,
+    pub tick: Option<u64>,
     pub cache: Option<CacheConfig>,
 }
 

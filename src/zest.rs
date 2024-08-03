@@ -9,7 +9,8 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use mime::Mime;
 use std::{
-    collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path, sync::Arc,
+    collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path,
+    sync::Arc, time::Duration,
 };
 
 #[cfg(feature = "log")]
@@ -33,6 +34,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
     sync::Semaphore,
+    time::timeout,
 };
 
 const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
@@ -289,18 +291,38 @@ where
             return Ok(());
         }
 
-        #[allow(unused_mut)]
-        let (mut stream, _addr) = listener.accept().await?;
+        // NOTE: Use timeout for accpet().await because it's the only possible way for hot reloading,
+        // **remove it if you dont need**, and then you need a request at the original port after hot
+        // reloading (None.unwrap())
 
-        #[cfg(feature = "ip_limit")]
+        #[allow(unused_mut)]
+        if let Ok(Ok((mut stream, _addr))) = timeout(
+            Duration::from_millis(config.server.tick.unwrap_or(256)),
+            listener.accept(),
+        )
+        .await
         {
-            if let Some(ref allowlist) = _allowlist {
-                for item in allowlist {
-                    if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
-                        if !cidr.contains(&_addr.ip()) {
-                            if allowlist.last() != Some(item) {
-                                continue;
-                            } else {
+            #[cfg(feature = "ip_limit")]
+            {
+                if let Some(ref allowlist) = _allowlist {
+                    for item in allowlist {
+                        if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
+                            if !cidr.contains(&_addr.ip()) {
+                                if allowlist.last() != Some(item) {
+                                    continue;
+                                } else {
+                                    stream.shutdown().await?;
+                                    continue 'handle;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(ref blocklist) = _blocklist {
+                    for item in blocklist {
+                        if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
+                            if cidr.contains(&_addr.ip()) {
                                 stream.shutdown().await?;
                                 continue 'handle;
                             }
@@ -309,59 +331,59 @@ where
                 }
             }
 
-            if let Some(ref blocklist) = _blocklist {
-                for item in blocklist {
-                    if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
-                        if cidr.contains(&_addr.ip()) {
-                            stream.shutdown().await?;
-                            continue 'handle;
-                        }
+            let rate_limiter = Arc::clone(&rate_limiter);
+            tokio::spawn(async move {
+                if rate_limiter.clone().try_acquire_owned().is_ok() {
+                    let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
+
+                    #[cfg(feature = "log")]
+                    {
+                        match _status_code {
+                            200 => {
+                                logger().log(
+                                    &log::Record::builder()
+                                        .level(log::Level::Info)
+                                        .target("access")
+                                        .args(format_args!(
+                                            "\"{}\" {} - {}",
+                                            _req, _status_code, _addr
+                                        ))
+                                        .build(),
+                                );
+                            }
+                            400.. => {
+                                logger().log(
+                                    &log::Record::builder()
+                                        .level(log::Level::Error)
+                                        .target("error")
+                                        .args(format_args!(
+                                            "\"{}\" {} - {}",
+                                            _req, _status_code, _addr
+                                        ))
+                                        .build(),
+                                );
+                            }
+                            _ => {
+                                logger().log(
+                                    &log::Record::builder()
+                                        .level(log::Level::Warn)
+                                        .target("access")
+                                        .args(format_args!(
+                                            "\"{}\" {} - {}",
+                                            _req, _status_code, _addr
+                                        ))
+                                        .build(),
+                                );
+                            }
+                        };
                     }
+                } else {
+                    let _ = stream.shutdown().await;
                 }
-            }
+            });
+        } else {
+            return Ok(());
         }
-
-        let rate_limiter = Arc::clone(&rate_limiter);
-        tokio::spawn(async move {
-            if rate_limiter.clone().try_acquire_owned().is_ok() {
-                let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
-
-                #[cfg(feature = "log")]
-                {
-                    match _status_code {
-                        200 => {
-                            logger().log(
-                                &log::Record::builder()
-                                    .level(log::Level::Info)
-                                    .target("access")
-                                    .args(format_args!("\"{}\" {} - {}", _req, _status_code, _addr))
-                                    .build(),
-                            );
-                        }
-                        400.. => {
-                            logger().log(
-                                &log::Record::builder()
-                                    .level(log::Level::Error)
-                                    .target("error")
-                                    .args(format_args!("\"{}\" {} - {}", _req, _status_code, _addr))
-                                    .build(),
-                            );
-                        }
-                        _ => {
-                            logger().log(
-                                &log::Record::builder()
-                                    .level(log::Level::Warn)
-                                    .target("access")
-                                    .args(format_args!("\"{}\" {} - {}", _req, _status_code, _addr))
-                                    .build(),
-                            );
-                        }
-                    };
-                }
-            } else {
-                let _ = stream.shutdown().await;
-            }
-        });
     }
 }
 
