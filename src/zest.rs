@@ -362,11 +362,11 @@ async fn init_cache() -> io::Result<()> {
     tokio::spawn(async move {
         loop {
             if _b {
-                let mut index_cache = INDEX_CACHE.try_lock().unwrap();
-                index_cache.pop_lru();
-            } else {
-                let mut file_cache = FILE_CACHE.try_lock().unwrap();
-                file_cache.pop_lru();
+                if let Some(mut index_cache) = INDEX_CACHE.try_lock() {
+                    index_cache.clear();
+                }
+            } else if let Some(mut file_cache) = FILE_CACHE.try_lock() {
+                file_cache.clear();
             }
             _b = !_b;
             thread::sleep(tick);
