@@ -26,7 +26,7 @@ use std::os::linux::fs::MetadataExt;
 use {
     async_mutex::Mutex, // faster than tokio::sync::Mutex
     lru::LruCache,
-    std::num::NonZeroUsize,
+    std::{num::NonZeroUsize, thread},
 };
 
 use tokio::{
@@ -41,6 +41,7 @@ const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
 
 lazy_static! {
     pub static ref T: Arc<RwLock<Option<i32>>> = Arc::new(RwLock::new(None));
+    pub static ref DEFAULT_TICK: Duration = Duration::from_millis(1024);
 }
 
 #[cfg(feature = "lru_cache")]
@@ -285,14 +286,9 @@ where
 
             return Ok(());
         }
-
-        // NOTE: Use timeout for accpet().await because it's the only possible way for hot reloading,
-        // **remove it if you dont need**, and then you need a request at the original port after hot
-        // reloading (None.unwrap())
-
         #[allow(unused_mut)]
         if let Ok(Ok((mut stream, _addr))) = timeout(
-            Duration::from_millis(config.server.tick.unwrap_or(256)),
+            config.server.tick.unwrap_or(*DEFAULT_TICK),
             listener.accept(),
         )
         .await
@@ -355,6 +351,31 @@ where
     }
 }
 
+#[cfg(feature = "lru_cache")]
+async fn init_cache() -> io::Result<()> {
+    let config = CONFIG.try_read().unwrap();
+    let tick = config.clone().server.tick.unwrap_or(*DEFAULT_TICK);
+
+    drop(config);
+
+    let mut _b: bool = false;
+    tokio::spawn(async move {
+        loop {
+            if _b {
+                let mut index_cache = INDEX_CACHE.try_lock().unwrap();
+                index_cache.pop_lru();
+            } else {
+                let mut file_cache = FILE_CACHE.try_lock().unwrap();
+                file_cache.pop_lru();
+            }
+            _b = !_b;
+            thread::sleep(tick);
+        }
+    });
+
+    Ok(())
+}
+
 pub async fn zest_main() -> Result<(), Box<dyn Error>> {
     *CONFIG_PATH.lock()? = ARGS.config.clone().unwrap_or_default();
     let config = DEFAULT_CONFIG.deref();
@@ -365,6 +386,9 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
     init_logger(&config.clone()).await;
 
     init_signal().await.unwrap();
+
+    #[cfg(feature = "lru_cache")]
+    init_cache().await.unwrap();
 
     loop {
         let _config = CONFIG.try_read().unwrap();

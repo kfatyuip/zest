@@ -3,7 +3,7 @@ use clap::{command, Parser};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_yml::Value;
-use std::{collections::HashMap, env::current_dir, fs, path::PathBuf, sync::Mutex};
+use std::{collections::HashMap, env::current_dir, fs, path::PathBuf, sync::Mutex, time::Duration};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -50,7 +50,7 @@ pub struct ServerConfig {
     pub info: String,
     pub root: PathBuf,
     pub error_page: Option<PathBuf>,
-    pub tick: Option<u64>,
+    pub tick: Option<Duration>,
     pub cache: Option<CacheConfig>,
 }
 

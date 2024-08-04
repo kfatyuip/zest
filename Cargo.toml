@@ -10,7 +10,7 @@ strip = "symbols"
 lto = true
 
 [features]
-default = ["index_sort", "log", "ip_limit"]
+default = ["index_sort", "log", "ip_limit", "lru_cache"]
 index_sort = []
 lru_cache = ["dep:lru"]
 ip_limit = ["dep:ipnet"]
