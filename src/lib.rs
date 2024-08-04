@@ -1,3 +1,6 @@
+#[macro_use]
+pub mod macros;
+
 pub mod config;
 pub mod init;
 pub mod route;

@@ -281,13 +281,8 @@ where
     'handle: loop {
         if T.try_read().unwrap().is_none() {
             #[cfg(feature = "log")]
-            logger().log(
-                &log::Record::builder()
-                    .level(log::Level::Info)
-                    .target("access")
-                    .args(format_args!("config reloaded!"))
-                    .build(),
-            );
+            info!("config reloaded!");
+
             return Ok(());
         }
 
@@ -340,40 +335,13 @@ where
                     {
                         match _status_code {
                             200 => {
-                                logger().log(
-                                    &log::Record::builder()
-                                        .level(log::Level::Info)
-                                        .target("access")
-                                        .args(format_args!(
-                                            "\"{}\" {} - {}",
-                                            _req, _status_code, _addr
-                                        ))
-                                        .build(),
-                                );
+                                info!("\"{}\" {} - {}", _req, _status_code, _addr);
                             }
                             400.. => {
-                                logger().log(
-                                    &log::Record::builder()
-                                        .level(log::Level::Error)
-                                        .target("error")
-                                        .args(format_args!(
-                                            "\"{}\" {} - {}",
-                                            _req, _status_code, _addr
-                                        ))
-                                        .build(),
-                                );
+                                error!("\"{}\" {} - {}", _req, _status_code, _addr);
                             }
                             _ => {
-                                logger().log(
-                                    &log::Record::builder()
-                                        .level(log::Level::Warn)
-                                        .target("access")
-                                        .args(format_args!(
-                                            "\"{}\" {} - {}",
-                                            _req, _status_code, _addr
-                                        ))
-                                        .build(),
-                                );
+                                warn!("\"{}\" {} - {}", _req, _status_code, _addr);
                             }
                         };
                     }
