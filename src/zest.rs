@@ -1,13 +1,14 @@
 use crate::{
-    config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG},
-    init::{init_cache, init_signal, DATE_FORMAT, DEFAULT_TICK, FILE_CACHE, INDEX_CACHE, T},
+    config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_TICK},
+    init::{init_cache, init_signal, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, T},
     route::{location_index, mime_match, root_relative, status_page},
 };
 
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use mime::Mime;
 use std::{
-    collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path, sync::Arc,
+    collections::HashMap, env::set_current_dir, error::Error, ops::Deref, path::Path, sync::Arc,
 };
 
 #[cfg(feature = "log")]
@@ -67,7 +68,7 @@ impl<'a> Response<'a> {
     }
 }
 
-async fn handle_connection<S>(mut stream: S) -> io::Result<(i32, String)>
+async fn handle_connection<S>(mut stream: S) -> Result<(i32, String)>
 where
     S: AsyncReadExt + AsyncWriteExt + Unpin,
 {
@@ -305,12 +306,14 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
     set_current_dir(config.clone().server.root)?;
 
     #[cfg(feature = "log")]
-    init_logger(&config.clone()).await;
+    init_logger(&config.clone())
+        .await
+        .context("failed to init logger")?;
 
-    init_signal().await.unwrap();
+    init_signal().await.context("failed to init signal")?;
 
     #[cfg(feature = "lru_cache")]
-    init_cache().await.unwrap();
+    init_cache().await.context("failed to init lru cache")?;
 
     loop {
         let _config = CONFIG.try_read().unwrap();

@@ -3,7 +3,22 @@ use clap::{command, Parser};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_yml::Value;
-use std::{collections::HashMap, env::current_dir, fs, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
+use std::{
+    collections::HashMap,
+    env::current_dir,
+    fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+lazy_static! {
+    pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("".to_owned());
+    pub static ref DEFAULT_CONFIG: Config = init_config();
+    pub static ref CONFIG: Arc<RwLock<Config>> = Arc::new(RwLock::new((*DEFAULT_CONFIG).clone()));
+    pub static ref ARGS: Args = Args::parse();
+    pub static ref DEFAULT_TICK: Duration = Duration::from_millis(1024);
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -27,8 +42,8 @@ impl Default for Config {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap_or(".".into()),
                 error_page: Some("404.html".to_owned().into()),
-                tick: None,
-                cache: None,
+                tick: Some(*DEFAULT_TICK),
+                cache: Some(CacheConfig::default()),
             },
             allowlist: None,
             blocklist: None,
@@ -97,13 +112,6 @@ pub struct Args {
 
     #[arg(short, long, default_value = None, help = "set the listening port")]
     pub port: Option<i32>,
-}
-
-lazy_static! {
-    pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("".to_owned());
-    pub static ref DEFAULT_CONFIG: Config = init_config();
-    pub static ref CONFIG: Arc<RwLock<Config>> = Arc::new(RwLock::new((*DEFAULT_CONFIG).clone()));
-    pub static ref ARGS: Args = Args::parse();
 }
 
 pub fn init_config() -> Config {

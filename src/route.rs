@@ -1,8 +1,8 @@
 use crate::config::{LocationConfig, CONFIG};
+use anyhow::{anyhow, Context, Result};
 use serde_yml::from_value;
 use std::{
     fmt::Write,
-    io::{ErrorKind, Result},
     path::{Path, PathBuf},
 };
 use tokio::fs::{self, read_dir, DirEntry};
@@ -18,23 +18,16 @@ pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
 
     for (s, v) in &config.locations.clone().unwrap_or_default() {
         if root_relative(s) == location.trim_end_matches('/') {
-            match from_value::<LocationConfig>(v.clone()) {
-                Ok(_location) => {
-                    if let Some(index) = _location.index {
-                        return fs::read_to_string(root_relative(
-                            PathBuf::from(location)
-                                .join(index.clone())
-                                .as_path()
-                                .to_str()
-                                .unwrap(),
-                        ))
-                        .await;
-                    } else if _location.auto_index.is_none() || !_location.auto_index.unwrap() {
-                        return Err(ErrorKind::Unsupported.into());
-                    }
-                }
-                _ => {
-                    continue;
+            if let Ok(_location) = from_value::<LocationConfig>(v.clone()) {
+                if let Some(index) = _location.index {
+                    let path = PathBuf::from(location).join(index.clone());
+                    let _path = root_relative(path.as_path().to_str().unwrap());
+
+                    return fs::read_to_string(_path)
+                        .await
+                        .with_context(move || format!("failed to read path {}", _path));
+                } else if _location.auto_index.is_none() || !_location.auto_index.unwrap() {
+                    return Err(anyhow!("Index not supported"));
                 }
             }
         }

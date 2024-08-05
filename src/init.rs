@@ -1,13 +1,12 @@
-use crate::config::{init_config, CONFIG, DEFAULT_CONFIG};
+use crate::config::{init_config, CONFIG, DEFAULT_CONFIG, DEFAULT_TICK};
+use anyhow::Result;
 use async_mutex::Mutex;
 use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
 use lru::LruCache;
 use signal_hook::{consts::SIGHUP, iterator::Signals};
-use std::{
-    env::set_current_dir, error::Error, io, num::NonZeroUsize, sync::Arc, thread, time::Duration,
-};
+use std::{env::set_current_dir, io, num::NonZeroUsize, sync::Arc, thread};
 
 #[cfg(feature = "log")]
 use {
@@ -22,7 +21,6 @@ use {
 
 lazy_static! {
     pub static ref T: Arc<RwLock<Option<i32>>> = Arc::new(RwLock::new(None));
-    pub static ref DEFAULT_TICK: Duration = Duration::from_millis(1024);
     pub static ref LOGGER_HANDLE: Mutex<Option<Handle>> = Mutex::new(None);
 }
 
@@ -137,15 +135,17 @@ where
 }
 
 #[cfg(feature = "log")]
-pub async fn init_logger<C>(config: C)
+pub async fn init_logger<C>(config: C) -> Result<(), log::SetLoggerError>
 where
     C: Deref<Target = Config>,
 {
     let config = build_logger_config(config).await;
-    *LOGGER_HANDLE.lock().await = Some(log4rs::init_config(config).unwrap())
+    *LOGGER_HANDLE.lock().await = Some(log4rs::init_config(config)?);
+
+    Ok(())
 }
 
-pub async fn init_signal() -> Result<(), Box<dyn Error>> {
+pub async fn init_signal() -> io::Result<()> {
     let mut signals = Signals::new([SIGHUP])?;
 
     tokio::spawn(async move {
