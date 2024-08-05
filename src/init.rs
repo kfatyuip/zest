@@ -1,11 +1,11 @@
 use crate::config::{init_config, CONFIG, DEFAULT_CONFIG, DEFAULT_TICK};
-use anyhow::Result;
 use async_mutex::Mutex;
 use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
 use lru::LruCache;
 use signal_hook::{consts::SIGHUP, iterator::Signals};
+use std::num::NonZero;
 use std::{env::set_current_dir, io, num::NonZeroUsize, sync::Arc, thread};
 
 #[cfg(feature = "log")]
@@ -166,6 +166,20 @@ pub async fn init_signal() -> io::Result<()> {
                         handle.set_config(build_logger_config(&config.clone()).await);
                     }
                 }
+
+                let cache = config.server.cache.unwrap_or_default();
+                let (index_capacity, file_capacity) =
+                    (cache.index_capacity.unwrap(), cache.file_capacity.unwrap());
+
+                INDEX_CACHE
+                    .lock()
+                    .await
+                    .resize(NonZero::new(index_capacity).unwrap());
+
+                FILE_CACHE
+                    .lock()
+                    .await
+                    .resize(NonZero::new(file_capacity).unwrap());
 
                 let mut t = T.write().await;
                 *t = None;
