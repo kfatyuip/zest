@@ -1,12 +1,13 @@
-use crate::{
-    config::{init_config, CONFIG},
-    zest::T,
-};
+use crate::config::{init_config, CONFIG, DEFAULT_CONFIG};
 use async_mutex::Mutex;
+use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
+use lru::LruCache;
 use signal_hook::{consts::SIGHUP, iterator::Signals};
-use std::{env::set_current_dir, error::Error};
+use std::{
+    env::set_current_dir, error::Error, io, num::NonZeroUsize, sync::Arc, thread, time::Duration,
+};
 
 #[cfg(feature = "log")]
 use {
@@ -19,12 +20,50 @@ use {
     std::{ops::Deref, path::Path},
 };
 
-#[cfg(feature = "log")]
-const LOG_FORMAT: &str = "[{d(%Y-%m-%dT%H:%M:%SZ)} {h({l})}  zest] {m}\n";
-
 lazy_static! {
+    pub static ref T: Arc<RwLock<Option<i32>>> = Arc::new(RwLock::new(None));
+    pub static ref DEFAULT_TICK: Duration = Duration::from_millis(1024);
     pub static ref LOGGER_HANDLE: Mutex<Option<Handle>> = Mutex::new(None);
 }
+
+#[cfg(feature = "lru_cache")]
+lazy_static! {
+    pub static ref INDEX_CACHE: Mutex<LruCache<String, String>> = {
+        let cache = LruCache::new(
+            NonZeroUsize::new(
+                DEFAULT_CONFIG
+                    .server
+                    .cache
+                    .clone()
+                    .unwrap_or_default()
+                    .index_capacity
+                    .unwrap_or_default(),
+            )
+            .unwrap(),
+        );
+        Mutex::new(cache)
+    };
+    pub static ref FILE_CACHE: Mutex<LruCache<String, Vec<u8>>> = {
+        let cache = LruCache::new(
+            NonZeroUsize::new(
+                DEFAULT_CONFIG
+                    .server
+                    .cache
+                    .clone()
+                    .unwrap_or_default()
+                    .file_capacity
+                    .unwrap_or_default(),
+            )
+            .unwrap(),
+        );
+        Mutex::new(cache)
+    };
+}
+
+pub const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
+
+#[cfg(feature = "log")]
+const LOG_FORMAT: &str = "[{d(%Y-%m-%dT%H:%M:%SZ)} {h({l})}  zest] {m}\n";
 
 #[cfg(feature = "log")]
 pub async fn build_logger_config<C>(config: C) -> log4rs::Config
@@ -132,6 +171,31 @@ pub async fn init_signal() -> Result<(), Box<dyn Error>> {
                 *t = None;
                 drop(t);
             }
+        }
+    });
+
+    Ok(())
+}
+
+#[cfg(feature = "lru_cache")]
+pub async fn init_cache() -> io::Result<()> {
+    let config = CONFIG.try_read().unwrap();
+    let tick = config.clone().server.tick.unwrap_or(*DEFAULT_TICK);
+
+    drop(config);
+
+    let mut _b: bool = false;
+    tokio::spawn(async move {
+        loop {
+            if _b {
+                if let Some(mut index_cache) = INDEX_CACHE.try_lock() {
+                    index_cache.clear();
+                }
+            } else if let Some(mut file_cache) = FILE_CACHE.try_lock() {
+                file_cache.clear();
+            }
+            _b = !_b;
+            thread::sleep(tick);
         }
     });
 

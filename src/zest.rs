@@ -1,16 +1,13 @@
 use crate::{
     config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG},
-    init::init_signal,
+    init::{init_cache, init_signal, DATE_FORMAT, DEFAULT_TICK, FILE_CACHE, INDEX_CACHE, T},
     route::{location_index, mime_match, root_relative, status_page},
 };
 
-use async_rwlock::RwLock;
 use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
 use mime::Mime;
 use std::{
-    collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path,
-    sync::Arc, time::Duration,
+    collections::HashMap, env::set_current_dir, error::Error, io, ops::Deref, path::Path, sync::Arc,
 };
 
 #[cfg(feature = "log")]
@@ -22,13 +19,6 @@ use std::os::android::fs::MetadataExt;
 #[cfg(target_os = "linux")]
 use std::os::linux::fs::MetadataExt;
 
-#[cfg(feature = "lru_cache")]
-use {
-    async_mutex::Mutex, // faster than tokio::sync::Mutex
-    lru::LruCache,
-    std::{num::NonZeroUsize, thread},
-};
-
 use tokio::{
     fs::File,
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -36,47 +26,6 @@ use tokio::{
     sync::Semaphore,
     time::timeout,
 };
-
-const DATE_FORMAT: &str = "%a, %d %b %Y %H:%M:%S GMT";
-
-lazy_static! {
-    pub static ref T: Arc<RwLock<Option<i32>>> = Arc::new(RwLock::new(None));
-    pub static ref DEFAULT_TICK: Duration = Duration::from_millis(1024);
-}
-
-#[cfg(feature = "lru_cache")]
-lazy_static! {
-    static ref INDEX_CACHE: Mutex<LruCache<String, String>> = {
-        let cache = LruCache::new(
-            NonZeroUsize::new(
-                DEFAULT_CONFIG
-                    .server
-                    .cache
-                    .clone()
-                    .unwrap_or_default()
-                    .index_capacity
-                    .unwrap_or_default(),
-            )
-            .unwrap(),
-        );
-        Mutex::new(cache)
-    };
-    static ref FILE_CACHE: Mutex<LruCache<String, Vec<u8>>> = {
-        let cache = LruCache::new(
-            NonZeroUsize::new(
-                DEFAULT_CONFIG
-                    .server
-                    .cache
-                    .clone()
-                    .unwrap_or_default()
-                    .file_capacity
-                    .unwrap_or_default(),
-            )
-            .unwrap(),
-        );
-        Mutex::new(cache)
-    };
-}
 
 #[derive(Clone)]
 struct Response<'a> {
@@ -345,35 +294,8 @@ where
                     let _ = stream.shutdown().await;
                 }
             });
-        } else {
-            return Ok(());
         }
     }
-}
-
-#[cfg(feature = "lru_cache")]
-async fn init_cache() -> io::Result<()> {
-    let config = CONFIG.try_read().unwrap();
-    let tick = config.clone().server.tick.unwrap_or(*DEFAULT_TICK);
-
-    drop(config);
-
-    let mut _b: bool = false;
-    tokio::spawn(async move {
-        loop {
-            if _b {
-                if let Some(mut index_cache) = INDEX_CACHE.try_lock() {
-                    index_cache.clear();
-                }
-            } else if let Some(mut file_cache) = FILE_CACHE.try_lock() {
-                file_cache.clear();
-            }
-            _b = !_b;
-            thread::sleep(tick);
-        }
-    });
-
-    Ok(())
 }
 
 pub async fn zest_main() -> Result<(), Box<dyn Error>> {

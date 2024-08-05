@@ -8,7 +8,7 @@
 
 `ip_limit`: ip allowlist and ip blocklist (enabled by default)
 
-`lru_cache`: cache the pages for better performance
+`lru_cache`: cache the pages for better performance (enabled by default)
 
 **Configuration** 
 

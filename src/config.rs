@@ -3,7 +3,7 @@ use clap::{command, Parser};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_yml::Value;
-use std::{collections::HashMap, env::current_dir, fs, path::PathBuf, sync::Mutex, time::Duration};
+use std::{collections::HashMap, env::current_dir, fs, path::PathBuf, sync::{Arc, Mutex}, time::Duration};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
@@ -102,7 +102,7 @@ pub struct Args {
 lazy_static! {
     pub static ref CONFIG_PATH: Mutex<String> = Mutex::new("".to_owned());
     pub static ref DEFAULT_CONFIG: Config = init_config();
-    pub static ref CONFIG: RwLock<Config> = RwLock::new((*DEFAULT_CONFIG).clone());
+    pub static ref CONFIG: Arc<RwLock<Config>> = Arc::new(RwLock::new((*DEFAULT_CONFIG).clone()));
     pub static ref ARGS: Args = Args::parse();
 }
 
