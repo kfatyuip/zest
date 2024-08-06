@@ -1,4 +1,4 @@
-use zest::zest::zest_main;
+use zest::server::zest_main;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

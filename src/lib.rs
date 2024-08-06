@@ -4,7 +4,7 @@ pub mod macros;
 pub mod config;
 pub mod init;
 pub mod route;
-pub mod zest;
+pub mod server;
 
 #[cfg(test)]
 mod tests {
