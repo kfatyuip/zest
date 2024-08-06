@@ -1,6 +1,6 @@
 [package]
 name = "zest"
-version = "0.1.9"
+version = "0.2.0"
 edition = "2021"
 
 [profile.release]
@@ -18,6 +18,7 @@ log = ["dep:log"]
 
 [dependencies]
 anyhow = "1.0.86"
+arc-swap = "1.7.1"
 async-mutex = "1.4.0"
 async-rwlock = "1.3.0"
 chrono = { version = "0.4.38", features = ["clock", "now"] }

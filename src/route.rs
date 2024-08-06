@@ -14,7 +14,7 @@ pub fn root_relative(p: &str) -> &str {
 
 #[inline]
 pub async fn location_index(path: PathBuf, location: &str) -> Result<String> {
-    let config = CONFIG.try_read().unwrap();
+    let config = CONFIG.load();
 
     for (s, v) in &config.locations.clone().unwrap_or_default() {
         if root_relative(s) == location.trim_end_matches('/') {

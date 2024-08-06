@@ -72,7 +72,7 @@ async fn handle_connection<S>(mut stream: S) -> Result<(i32, String)>
 where
     S: AsyncReadExt + AsyncWriteExt + Unpin,
 {
-    let config = CONFIG.try_read().unwrap();
+    let config = CONFIG.load();
 
     let mut response: Response = Response {
         version: "1.1",
@@ -316,12 +316,10 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
     init_cache().await.context("failed to init lru cache")?;
 
     loop {
-        let _config = CONFIG.try_read().unwrap();
-        let config = _config.clone();
-        drop(_config);
+        let config = CONFIG.load();
 
         let handle = tokio::spawn(async move {
-            zest_listener(&config.clone()).await.unwrap();
+            zest_listener(config.clone()).await.unwrap();
         });
 
         let mut t = T.try_write().unwrap();

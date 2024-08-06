@@ -1,0 +1,29 @@
+name: Release
+
+on: 
+  push:   
+    tags:
+    - '[0-9]+.[0-9]+.[0-9]+' 
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps: 
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose --release
+      - name: Run tests
+        run: cargo test --verbose --release
+      - name: Release binary
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/release/zest
+          asset_name: zest-amd64-release
+          tag: ${{ github.ref }}

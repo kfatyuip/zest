@@ -1,6 +1,6 @@
 use crate::config::{init_config, CONFIG, DEFAULT_CONFIG, DEFAULT_TICK};
-use async_mutex::Mutex;
 use async_rwlock::RwLock;
+use async_mutex::Mutex;
 use lazy_static::lazy_static;
 use log4rs::Handle;
 use lru::LruCache;
@@ -153,9 +153,7 @@ pub async fn init_signal() -> io::Result<()> {
             if sig == SIGHUP {
                 let config: crate::config::Config = init_config();
 
-                let mut _c = CONFIG.try_write().unwrap();
-                *_c = config.clone();
-                drop(_c);
+                CONFIG.store(Arc::new(config.clone()));
 
                 set_current_dir(config.clone().server.root).unwrap();
 
@@ -184,7 +182,7 @@ pub async fn init_signal() -> io::Result<()> {
                 let mut t = T.write().await;
                 *t = None;
                 drop(t);
-            }
+           }
         }
     });
 
@@ -193,10 +191,8 @@ pub async fn init_signal() -> io::Result<()> {
 
 #[cfg(feature = "lru_cache")]
 pub async fn init_cache() -> io::Result<()> {
-    let config = CONFIG.try_read().unwrap();
+    let config = CONFIG.load();
     let tick = config.clone().server.tick.unwrap_or(*DEFAULT_TICK);
-
-    drop(config);
 
     let mut _b: bool = false;
     tokio::spawn(async move {
