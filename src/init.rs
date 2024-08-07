@@ -1,6 +1,6 @@
-use crate::config::{init_config, CONFIG, DEFAULT_CONFIG, DEFAULT_TICK};
-use async_rwlock::RwLock;
+use crate::config::{init_config, CONFIG, DEFAULT_CONFIG, DEFAULT_INTERVAL};
 use async_mutex::Mutex;
+use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
 use lru::LruCache;
@@ -26,7 +26,7 @@ lazy_static! {
 
 #[cfg(feature = "lru_cache")]
 lazy_static! {
-    pub static ref INDEX_CACHE: Mutex<LruCache<String, String>> = {
+    pub static ref INDEX_CACHE: RwLock<LruCache<String, String>> = {
         let cache = LruCache::new(
             NonZeroUsize::new(
                 DEFAULT_CONFIG
@@ -39,9 +39,9 @@ lazy_static! {
             )
             .unwrap(),
         );
-        Mutex::new(cache)
+        RwLock::new(cache)
     };
-    pub static ref FILE_CACHE: Mutex<LruCache<String, Vec<u8>>> = {
+    pub static ref FILE_CACHE: RwLock<LruCache<String, Vec<u8>>> = {
         let cache = LruCache::new(
             NonZeroUsize::new(
                 DEFAULT_CONFIG
@@ -54,7 +54,7 @@ lazy_static! {
             )
             .unwrap(),
         );
-        Mutex::new(cache)
+        RwLock::new(cache)
     };
 }
 
@@ -170,19 +170,19 @@ pub async fn init_signal() -> io::Result<()> {
                     (cache.index_capacity.unwrap(), cache.file_capacity.unwrap());
 
                 INDEX_CACHE
-                    .lock()
+                    .write()
                     .await
                     .resize(NonZero::new(index_capacity).unwrap());
 
                 FILE_CACHE
-                    .lock()
+                    .write()
                     .await
                     .resize(NonZero::new(file_capacity).unwrap());
 
                 let mut t = T.write().await;
                 *t = None;
                 drop(t);
-           }
+            }
         }
     });
 
@@ -192,20 +192,20 @@ pub async fn init_signal() -> io::Result<()> {
 #[cfg(feature = "lru_cache")]
 pub async fn init_cache() -> io::Result<()> {
     let config = CONFIG.load();
-    let tick = config.clone().server.tick.unwrap_or(*DEFAULT_TICK);
+    let interval = config.clone().server.interval.unwrap_or(*DEFAULT_INTERVAL);
 
     let mut _b: bool = false;
     tokio::spawn(async move {
         loop {
             if _b {
-                if let Some(mut index_cache) = INDEX_CACHE.try_lock() {
+                if let Some(mut index_cache) = INDEX_CACHE.try_write() {
                     index_cache.clear();
                 }
-            } else if let Some(mut file_cache) = FILE_CACHE.try_lock() {
+            } else if let Some(mut file_cache) = FILE_CACHE.try_write() {
                 file_cache.clear();
             }
             _b = !_b;
-            thread::sleep(tick);
+            thread::sleep(interval);
         }
     });
 

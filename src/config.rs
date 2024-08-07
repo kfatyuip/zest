@@ -17,7 +17,7 @@ lazy_static! {
     pub static ref DEFAULT_CONFIG: Config = init_config();
     pub static ref CONFIG: ArcSwap<Config> = ArcSwap::from(Arc::new((*DEFAULT_CONFIG).clone()));
     pub static ref ARGS: Args = Args::parse();
-    pub static ref DEFAULT_TICK: Duration = Duration::from_millis(1024);
+    pub static ref DEFAULT_INTERVAL: Duration = Duration::from_millis(1024);
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -42,7 +42,7 @@ impl Default for Config {
                 info: "Powered by Rust".to_owned(),
                 root: current_dir().unwrap_or(".".into()),
                 error_page: Some("404.html".to_owned().into()),
-                tick: Some(*DEFAULT_TICK),
+                interval: Some(*DEFAULT_INTERVAL),
                 cache: Some(CacheConfig::default()),
             },
             allowlist: None,
@@ -65,7 +65,7 @@ pub struct ServerConfig {
     pub info: String,
     pub root: PathBuf,
     pub error_page: Option<PathBuf>,
-    pub tick: Option<Duration>,
+    pub interval: Option<Duration>,
     pub cache: Option<CacheConfig>,
 }
 

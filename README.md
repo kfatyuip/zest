@@ -21,7 +21,7 @@ server:
   info: "Powered by Rust"
   root: .
   error_page: 404.html # optional
-  tick: 256 # optional (ms)
+  interval: 256 # optional (ms)
   cache: # optional
     index_capacity: 16
     file_capacity: 32
@@ -51,13 +51,13 @@ logging: # optional
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   264.01us  114.49us   2.60ms   81.90%
-    Req/Sec     4.37k   235.68     4.75k    81.93%
-  175701 requests in 10.10s, 139.08MB read
-  Socket errors: connect 0, read 175699, write 0, timeout 0
-Requests/sec:  17396.48
-Transfer/sec:     13.77MB
-wrk http://localhost:8080 -t 4 -d 10s  1.45s user 12.12s system 133% cpu 10.154 total
+    Latency   260.35us  110.32us   3.49ms   82.65%
+    Req/Sec     4.38k   195.17     4.70k    76.73%
+  176010 requests in 10.10s, 139.32MB read
+  Socket errors: connect 0, read 176006, write 0, timeout 0
+Requests/sec:  17427.53
+Transfer/sec:     13.79MB
+wrk http://localhost:8080 -t 4 -d 10s  1.50s user 11.99s system 132% cpu 10.155 total
 ```
 
 + python -m http.server 8080

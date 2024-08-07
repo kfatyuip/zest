@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_TICK},
+    config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_INTERVAL},
     init::{init_cache, init_signal, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, T},
     route::{location_index, mime_match, root_relative, status_page},
 };
@@ -134,7 +134,7 @@ where
             let mut html: String = String::new();
             #[cfg(feature = "lru_cache")]
             {
-                let mut cache = INDEX_CACHE.lock().await;
+                let mut cache = INDEX_CACHE.write().await;
                 if let Some(ctx) = cache.get(&location) {
                     html.clone_from(ctx);
                 } else if let Ok(index) = location_index(path, &location).await {
@@ -166,7 +166,7 @@ where
 
                     #[cfg(feature = "lru_cache")]
                     {
-                        let mut cache = FILE_CACHE.lock().await;
+                        let mut cache = FILE_CACHE.write().await;
                         if let Some(content) = cache.get(&location) {
                             buffer = content.to_vec();
                         } else {
@@ -230,7 +230,7 @@ where
 
     #[allow(unused_labels)]
     'handle: loop {
-        if T.try_read().unwrap().is_none() {
+        if T.read().await.is_none() {
             #[cfg(feature = "log")]
             info!("config reloaded!");
 
@@ -238,7 +238,7 @@ where
         }
         #[allow(unused_mut)]
         if let Ok(Ok((mut stream, _addr))) = timeout(
-            config.server.tick.unwrap_or(*DEFAULT_TICK),
+            config.server.interval.unwrap_or(*DEFAULT_INTERVAL),
             listener.accept(),
         )
         .await
