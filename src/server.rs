@@ -73,6 +73,7 @@ where
     S: AsyncReadExt + AsyncWriteExt + Unpin,
 {
     let config = CONFIG.load();
+    let cache_config = config.server.cache.clone().unwrap_or_default();
 
     let mut response: Response = Response {
         version: "1.1",
@@ -142,6 +143,7 @@ where
                         .push(location.clone(), index)
                         .to_owned()
                         .unwrap_or_default();
+
                     html.clone_from(cache.get(&location).unwrap());
                 } else {
                     response.status_code = 301;
@@ -171,10 +173,16 @@ where
                             buffer = content.to_vec();
                         } else {
                             file.read_to_end(&mut buffer).await?;
-                            cache
-                                .push(location.clone(), buffer.clone())
-                                .to_owned()
-                                .unwrap_or_default();
+                            if file.metadata().await.unwrap().len()
+                                < cache_config
+                                    .file_maxsize
+                                    .unwrap_or(32768 * 1024 /* 32 MB */)
+                            {
+                                cache
+                                    .push(location.clone(), buffer.clone())
+                                    .to_owned()
+                                    .unwrap_or_default();
+                            }
                         }
                     }
 

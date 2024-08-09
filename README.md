@@ -14,17 +14,19 @@
 
 ```yaml
 bind:
-  addr: 127.0.0.1
+  addr: 0.0.0.0
   listen: 8080
 
 server:
   info: "Powered by Rust"
   root: .
   error_page: 404.html # optional
-  interval: 256 # optional (ms)
+  interval: 1024 # optional (ms)
   cache: # optional
+    interval: 8192 (ms)
     index_capacity: 16
     file_capacity: 32
+    file_maxsize: 32768 # Kb
 
 allowlist: # optional
   - 127.0.0.1

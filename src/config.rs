@@ -18,6 +18,7 @@ lazy_static! {
     pub static ref CONFIG: ArcSwap<Config> = ArcSwap::from(Arc::new((*DEFAULT_CONFIG).clone()));
     pub static ref ARGS: Args = Args::parse();
     pub static ref DEFAULT_INTERVAL: Duration = Duration::from_millis(1024);
+    pub static ref DEFAULT_CACHE_INTERVAL: Duration = Duration::from_millis(8192);
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -71,15 +72,19 @@ pub struct ServerConfig {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CacheConfig {
+    pub interval: Option<Duration>,
     pub index_capacity: Option<usize>,
     pub file_capacity: Option<usize>,
+    pub file_maxsize: Option<u64>,
 }
 
 impl Default for CacheConfig {
     fn default() -> Self {
         CacheConfig {
+            interval: Some(*DEFAULT_CACHE_INTERVAL),
             index_capacity: Some(16),
             file_capacity: Some(32),
+            file_maxsize: Some(32768),
         }
     }
 }

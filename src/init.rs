@@ -1,4 +1,4 @@
-use crate::config::{init_config, CONFIG, DEFAULT_CONFIG, DEFAULT_INTERVAL};
+use crate::config::{init_config, CONFIG, DEFAULT_CACHE_INTERVAL, DEFAULT_CONFIG};
 use async_mutex::Mutex;
 use async_rwlock::RwLock;
 use lazy_static::lazy_static;
@@ -35,7 +35,7 @@ lazy_static! {
                     .clone()
                     .unwrap_or_default()
                     .index_capacity
-                    .unwrap_or_default(),
+                    .unwrap_or(16),
             )
             .unwrap(),
         );
@@ -50,7 +50,7 @@ lazy_static! {
                     .clone()
                     .unwrap_or_default()
                     .file_capacity
-                    .unwrap_or_default(),
+                    .unwrap_or(32),
             )
             .unwrap(),
         );
@@ -192,7 +192,13 @@ pub async fn init_signal() -> io::Result<()> {
 #[cfg(feature = "lru_cache")]
 pub async fn init_cache() -> io::Result<()> {
     let config = CONFIG.load();
-    let interval = config.clone().server.interval.unwrap_or(*DEFAULT_INTERVAL);
+    let interval = config
+        .server
+        .cache
+        .clone()
+        .unwrap_or_default()
+        .interval
+        .unwrap_or(*DEFAULT_CACHE_INTERVAL);
 
     let mut _b: bool = false;
     tokio::spawn(async move {
