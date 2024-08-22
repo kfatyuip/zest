@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_INTERVAL},
-    init::{init_cache, init_signal, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, T},
+    init::{init_cache, init_signal, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, PID_FILE, T},
     route::{location_index, mime_match, root_relative, status_page},
 };
 
@@ -8,7 +8,13 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use mime::Mime;
 use std::{
-    collections::HashMap, env::set_current_dir, error::Error, ops::Deref, path::Path, sync::Arc,
+    collections::HashMap,
+    env::{self, set_current_dir},
+    error::Error,
+    fs,
+    ops::Deref,
+    path::Path,
+    sync::Arc,
 };
 
 #[cfg(feature = "log")]
@@ -313,12 +319,30 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
 
     set_current_dir(config.clone().server.root)?;
 
+    let runtime_dir = env::temp_dir();
+    let zest_pid = runtime_dir.join("zest.pid");
+    fs::create_dir_all(zest_pid.clone()).with_context(|| {
+        format!(
+            "failed to create dir {}",
+            zest_pid.as_path().to_str().unwrap()
+        )
+    })?;
+    let pid_file = zest_pid.clone().join(std::process::id().to_string());
+    *PID_FILE.try_lock().unwrap() = Some(pid_file.clone());
+
+    File::create(pid_file.clone()).await.with_context(|| {
+        format!(
+            "failed to create file {}",
+            pid_file.as_path().to_str().unwrap()
+        )
+    })?;
+
     #[cfg(feature = "log")]
     init_logger(&config.clone())
         .await
         .context("failed to init logger")?;
 
-    init_signal().await.context("failed to init signal")?;
+    init_signal().await.context("failed to init signal hook")?;
 
     #[cfg(feature = "lru_cache")]
     init_cache().await.context("failed to init lru cache")?;

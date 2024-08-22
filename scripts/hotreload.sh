@@ -1,3 +1,7 @@
 #!/bin/bash
 
-kill -SIGHUP $(pidof zest)
+[[ -z $TMPDIR ]] && TMPDIR=/tmp
+
+for pid in $(ls $TMPDIR/zest.pid); do
+	kill -HUP $pid
+done

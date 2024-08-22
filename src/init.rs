@@ -4,9 +4,17 @@ use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
 use lru::LruCache;
-use signal_hook::{consts::SIGHUP, iterator::Signals};
-use std::num::NonZero;
-use std::{env::set_current_dir, io, num::NonZeroUsize, sync::Arc, thread};
+use signal_hook::{
+    consts::{SIGHUP, SIGINT},
+    iterator::Signals,
+};
+use std::{
+    fs,
+    num::NonZero,
+    path::PathBuf,
+    process,
+    {env::set_current_dir, io, num::NonZeroUsize, sync::Arc, thread},
+};
 
 #[cfg(feature = "log")]
 use {
@@ -20,6 +28,7 @@ use {
 };
 
 lazy_static! {
+    pub static ref PID_FILE: Mutex<Option<PathBuf>> = Mutex::new(None);
     pub static ref T: Arc<RwLock<Option<i32>>> = Arc::new(RwLock::new(None));
     pub static ref LOGGER_HANDLE: Mutex<Option<Handle>> = Mutex::new(None);
 }
@@ -146,7 +155,7 @@ where
 }
 
 pub async fn init_signal() -> io::Result<()> {
-    let mut signals = Signals::new([SIGHUP])?;
+    let mut signals = Signals::new([SIGHUP, SIGINT])?;
 
     tokio::spawn(async move {
         for sig in signals.forever() {
@@ -182,6 +191,9 @@ pub async fn init_signal() -> io::Result<()> {
                 let mut t = T.write().await;
                 *t = None;
                 drop(t);
+            } else if sig == SIGINT {
+                fs::remove_file(PID_FILE.try_lock().unwrap().clone().unwrap().as_path()).unwrap();
+                process::exit(0);
             }
         }
     });
