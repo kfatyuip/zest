@@ -9,7 +9,7 @@ use signal_hook::{
     iterator::Signals,
 };
 use std::{
-    fs,
+    fs::{create_dir_all, remove_file, File},
     num::NonZero,
     path::PathBuf,
     process,
@@ -92,7 +92,11 @@ where
     let logging = &config.logging.clone().unwrap_or_default();
     builder = if let Some(access_log) = &logging.access_log {
         let access_log_path = Path::new(&access_log);
-        std::fs::File::create(access_log_path).unwrap();
+        let parent = access_log_path.parent().unwrap();
+        if !parent.exists() {
+            create_dir_all(parent).unwrap();
+        }
+        File::create(access_log_path).unwrap();
         builder.appender(
             Appender::builder().build(
                 "logfile_access",
@@ -110,7 +114,11 @@ where
 
     builder = if let Some(error_log) = &logging.error_log {
         let error_log_path = Path::new(&error_log);
-        std::fs::File::create(error_log_path).unwrap();
+        let parent = error_log_path.parent().unwrap();
+        if !parent.exists() {
+            create_dir_all(parent).unwrap();
+        }
+        File::create(error_log_path).unwrap();
         builder.appender(
             Appender::builder().build(
                 "logfile_error",
@@ -192,7 +200,7 @@ pub async fn init_signal() -> io::Result<()> {
                 *t = None;
                 drop(t);
             } else if sig == SIGINT {
-                fs::remove_file(PID_FILE.try_lock().unwrap().clone().unwrap().as_path()).unwrap();
+                remove_file(PID_FILE.try_lock().unwrap().clone().unwrap().as_path()).unwrap();
                 process::exit(0);
             }
         }
