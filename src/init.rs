@@ -9,7 +9,7 @@ use signal_hook::{
     iterator::Signals,
 };
 use std::{
-    fs::{create_dir_all, remove_file, File},
+    fs::remove_file,
     num::NonZero,
     path::PathBuf,
     process,
@@ -24,7 +24,11 @@ use {
         config::{Appender, Logger, Root},
         encode::pattern::PatternEncoder,
     },
-    std::{ops::Deref, path::Path},
+    std::{
+        fs::{create_dir_all, File},
+        ops::Deref,
+        path::Path,
+    },
 };
 
 lazy_static! {

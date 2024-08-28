@@ -14,6 +14,7 @@ use std::{
     fs,
     ops::Deref,
     path::Path,
+    process,
     sync::Arc,
 };
 
@@ -31,7 +32,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
     sync::Semaphore,
-    time::timeout,
+    time::{sleep, timeout},
 };
 
 #[derive(Clone)]
@@ -230,8 +231,16 @@ pub async fn zest_listener<C>(config: C) -> Result<(), Box<dyn Error>>
 where
     C: Deref<Target = Config>,
 {
-    let listener =
-        TcpListener::bind(format!("{}:{}", config.bind.addr, config.bind.listen)).await?;
+    let listener = match TcpListener::bind(format!("{}:{}", config.bind.addr, config.bind.listen))
+        .await
+        .with_context(|| format!("failed to bind {}:{}", config.bind.addr, config.bind.listen))
+    {
+        Ok(_listener) => _listener,
+        Err(e) => {
+            eprintln!("{e:?}");
+            process::exit(1);
+        }
+    };
 
     let mut _allowlist: Option<Vec<String>> = config.clone().allowlist;
     let mut _blocklist: Option<Vec<String>> = config.clone().blocklist;
@@ -327,7 +336,7 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
             zest_pid.as_path().to_str().unwrap()
         )
     })?;
-    let pid_file = zest_pid.clone().join(std::process::id().to_string());
+    let pid_file = zest_pid.clone().join(process::id().to_string());
     *PID_FILE.try_lock().unwrap() = Some(pid_file.clone());
 
     File::create(pid_file.clone()).await.with_context(|| {
@@ -349,6 +358,7 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
 
     loop {
         let config = CONFIG.load();
+        let interval = config.server.interval.unwrap_or(*DEFAULT_INTERVAL);
 
         let handle = tokio::spawn(async move {
             zest_listener(config.clone()).await.unwrap();
@@ -359,5 +369,6 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
         drop(t);
 
         let _ = handle.await;
+        sleep(interval).await;
     }
 }

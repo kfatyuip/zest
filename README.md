@@ -53,13 +53,13 @@ logging: # optional
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   260.35us  110.32us   3.49ms   82.65%
-    Req/Sec     4.38k   195.17     4.70k    76.73%
-  176010 requests in 10.10s, 139.32MB read
-  Socket errors: connect 0, read 176006, write 0, timeout 0
-Requests/sec:  17427.53
-Transfer/sec:     13.79MB
-wrk http://localhost:8080 -t 4 -d 10s  1.50s user 11.99s system 132% cpu 10.155 total
+    Latency   256.64us   96.40us   2.05ms   82.21%
+    Req/Sec     4.42k   169.35     4.72k    70.54%
+  177752 requests in 10.10s, 140.70MB read
+  Socket errors: connect 0, read 177748, write 0, timeout 0
+Requests/sec:  17599.44
+Transfer/sec:     13.93MB
+wrk http://localhost:8080 -t 4 -d 10s  1.53s user 11.86s system 132% cpu 10.107 total
 ```
 
 + python -m http.server 8080
