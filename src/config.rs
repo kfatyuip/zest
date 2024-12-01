@@ -17,8 +17,8 @@ lazy_static! {
     pub static ref DEFAULT_CONFIG: Config = init_config();
     pub static ref CONFIG: ArcSwap<Config> = ArcSwap::from(Arc::new((*DEFAULT_CONFIG).clone()));
     pub static ref ARGS: Args = Args::parse();
-    pub static ref DEFAULT_INTERVAL: Duration = Duration::from_millis(1024);
-    pub static ref DEFAULT_CACHE_INTERVAL: Duration = Duration::from_millis(8192);
+    pub static ref DEFAULT_INTERVAL: Duration = Duration::from_millis(128);
+    pub static ref DEFAULT_CACHE_INTERVAL: Duration = Duration::from_secs(60);
 }
 
 #[derive(Serialize, Deserialize, Clone)]

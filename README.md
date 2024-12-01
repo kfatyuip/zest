@@ -21,9 +21,9 @@ server:
   info: "Powered by Rust"
   root: .
   error_page: 404.html # optional
-  interval: 1024 # optional (ms)
+  interval: 128 # optional (ms)
   cache: # optional
-    interval: 8192 # (ms)
+    interval: 60 # (s)
     index_capacity: 16
     file_capacity: 32
     file_maxsize: 32768 # Kb
