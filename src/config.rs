@@ -111,29 +111,14 @@ pub struct LoggingConfig {
 pub struct Args {
     #[arg(short, long, default_value = None, help = "set config file path")]
     pub config: Option<String>,
-
-    #[arg(short, long, default_value = None, help = "set the root directory")]
-    pub root: Option<PathBuf>,
-
-    #[arg(short, long, default_value = None, help = "set the listening port")]
-    pub port: Option<i32>,
 }
 
 pub fn init_config() -> Config {
     let config_path = CONFIG_PATH.lock().unwrap();
     let default_config = Config::default();
-    let mut config = match fs::read_to_string(config_path.to_owned()) {
+
+    match fs::read_to_string(config_path.to_owned()) {
         Ok(conf) => serde_yml::from_str(&conf).unwrap_or(default_config),
         _ => default_config,
-    };
-
-    if let Some(root) = &ARGS.root {
-        config.server.root = root.to_path_buf();
     }
-
-    if let Some(port) = &ARGS.port {
-        config.bind.listen = *port;
-    }
-
-    config
 }
