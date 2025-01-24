@@ -1,20 +1,10 @@
-use crate::config::{init_config, CONFIG, DEFAULT_CACHE_INTERVAL, DEFAULT_CONFIG};
+use crate::config::{CONFIG, DEFAULT_CACHE_INTERVAL, DEFAULT_CONFIG};
 use async_mutex::Mutex;
 use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
 use lru::LruCache;
-use signal_hook::{
-    consts::{SIGHUP, SIGINT},
-    iterator::Signals,
-};
-use std::{
-    fs::remove_file,
-    num::NonZero,
-    path::PathBuf,
-    process,
-    {env::set_current_dir, io, num::NonZeroUsize, sync::Arc, thread},
-};
+use std::{io, num::NonZeroUsize, path::PathBuf, thread};
 
 #[cfg(feature = "log")]
 use {
@@ -33,7 +23,6 @@ use {
 
 lazy_static! {
     pub static ref PID_FILE: Mutex<Option<PathBuf>> = Mutex::new(None);
-    pub static ref T: Arc<RwLock<Option<i32>>> = Arc::new(RwLock::new(None));
     pub static ref LOGGER_HANDLE: Mutex<Option<Handle>> = Mutex::new(None);
 }
 
@@ -162,53 +151,6 @@ where
 {
     let config = build_logger_config(config).await;
     *LOGGER_HANDLE.lock().await = Some(log4rs::init_config(config)?);
-
-    Ok(())
-}
-
-pub async fn init_signal() -> io::Result<()> {
-    let mut signals = Signals::new([SIGHUP, SIGINT])?;
-
-    tokio::spawn(async move {
-        for sig in signals.forever() {
-            if sig == SIGHUP {
-                let config: crate::config::Config = init_config();
-
-                CONFIG.store(Arc::new(config.clone()));
-
-                set_current_dir(config.clone().server.root).unwrap();
-
-                #[cfg(feature = "log")]
-                {
-                    let mut _handle = LOGGER_HANDLE.lock().await;
-                    if let Some(handle) = _handle.take() {
-                        handle.set_config(build_logger_config(&config.clone()).await);
-                    }
-                }
-
-                let cache = config.server.cache.unwrap_or_default();
-                let (index_capacity, file_capacity) =
-                    (cache.index_capacity.unwrap(), cache.file_capacity.unwrap());
-
-                INDEX_CACHE
-                    .write()
-                    .await
-                    .resize(NonZero::new(index_capacity).unwrap());
-
-                FILE_CACHE
-                    .write()
-                    .await
-                    .resize(NonZero::new(file_capacity).unwrap());
-
-                let mut t = T.write().await;
-                *t = None;
-                drop(t);
-            } else if sig == SIGINT {
-                remove_file(PID_FILE.try_lock().unwrap().clone().unwrap().as_path()).unwrap();
-                process::exit(0);
-            }
-        }
-    });
 
     Ok(())
 }

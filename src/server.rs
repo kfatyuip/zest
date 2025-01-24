@@ -1,17 +1,26 @@
 use crate::{
-    config::{Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_INTERVAL},
-    init::{init_cache, init_signal, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, PID_FILE, T},
+    config::{init_config, Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_INTERVAL},
+    init::{
+        build_logger_config, init_cache, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, LOGGER_HANDLE,
+        PID_FILE,
+    },
     route::{location_index, mime_match, root_relative, status_page},
 };
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use mime::Mime;
+use signal_hook::{
+    consts::{SIGHUP, SIGINT},
+    iterator::Signals,
+};
 use std::{
     collections::HashMap,
     env::{self, set_current_dir},
     error::Error,
-    fs,
+    fs::{self, remove_file},
+    io,
+    num::NonZero,
     ops::Deref,
     path::Path,
     process,
@@ -31,8 +40,11 @@ use tokio::{
     fs::File,
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
-    sync::Semaphore,
-    time::{sleep, timeout},
+    sync::{
+        oneshot::{self, Receiver, Sender},
+        Semaphore,
+    },
+    time::sleep,
 };
 
 #[derive(Clone)]
@@ -227,7 +239,7 @@ where
     Ok((response.status_code, req))
 }
 
-pub async fn zest_listener<C>(config: C) -> Result<(), Box<dyn Error>>
+pub async fn zest_listener<C>(config: C, rx: Receiver<()>) -> Result<(), Box<dyn Error>>
 where
     C: Deref<Target = Config>,
 {
@@ -251,31 +263,32 @@ where
         Semaphore::new(Semaphore::MAX_PERMITS)
     });
 
-    #[allow(unused_labels)]
-    'handle: loop {
-        if T.read().await.is_none() {
-            #[cfg(feature = "log")]
-            info!("config reloaded!");
+    tokio::select! {
+        _ = async {
+            'handle: loop {
+                let (mut stream, _addr) = listener.accept().await.unwrap();
+                #[cfg(feature = "ip_limit")]
+                {
+                    if let Some(ref allowlist) = _allowlist {
+                        for item in allowlist {
+                            if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
+                                if !cidr.contains(&_addr.ip()) {
+                                    if allowlist.last() != Some(item) {
+                                        continue;
+                                    } else {
+                                        stream.shutdown().await.unwrap();
+                                        continue 'handle;
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-            return Ok(());
-        }
-        #[allow(unused_mut)]
-        if let Ok(Ok((mut stream, _addr))) = timeout(
-            config.server.interval.unwrap_or(*DEFAULT_INTERVAL),
-            listener.accept(),
-        )
-        .await
-        {
-            #[cfg(feature = "ip_limit")]
-            {
-                if let Some(ref allowlist) = _allowlist {
-                    for item in allowlist {
-                        if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
-                            if !cidr.contains(&_addr.ip()) {
-                                if allowlist.last() != Some(item) {
-                                    continue;
-                                } else {
-                                    stream.shutdown().await?;
+                    if let Some(ref blocklist) = _blocklist {
+                        for item in blocklist {
+                            if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
+                                if cidr.contains(&_addr.ip()) {
+                                    stream.shutdown().await.unwrap();
                                     continue 'handle;
                                 }
                             }
@@ -283,43 +296,37 @@ where
                     }
                 }
 
-                if let Some(ref blocklist) = _blocklist {
-                    for item in blocklist {
-                        if let Ok(cidr) = item.parse::<ipnet::IpNet>() {
-                            if cidr.contains(&_addr.ip()) {
-                                stream.shutdown().await?;
-                                continue 'handle;
-                            }
+                let rate_limiter = Arc::clone(&rate_limiter);
+                tokio::spawn(async move {
+                    if rate_limiter.clone().try_acquire_owned().is_ok() {
+                        let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
+
+                        #[cfg(feature = "log")]
+                        {
+                            match _status_code {
+                                200 => {
+                                    info!("\"{}\" {} - {}", _req, _status_code, _addr);
+                                }
+                                400.. => {
+                                    error!("\"{}\" {} - {}", _req, _status_code, _addr);
+                                }
+                                _ => {
+                                    warn!("\"{}\" {} - {}", _req, _status_code, _addr);
+                                }
+                            };
                         }
+                    } else {
+                        let _ = stream.shutdown().await;
                     }
-                }
+                });
             }
-
-            let rate_limiter = Arc::clone(&rate_limiter);
-            tokio::spawn(async move {
-                if rate_limiter.clone().try_acquire_owned().is_ok() {
-                    let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
-
-                    #[cfg(feature = "log")]
-                    {
-                        match _status_code {
-                            200 => {
-                                info!("\"{}\" {} - {}", _req, _status_code, _addr);
-                            }
-                            400.. => {
-                                error!("\"{}\" {} - {}", _req, _status_code, _addr);
-                            }
-                            _ => {
-                                warn!("\"{}\" {} - {}", _req, _status_code, _addr);
-                            }
-                        };
-                    }
-                } else {
-                    let _ = stream.shutdown().await;
-                }
-            });
+        } => {}
+        _ = rx => {
+            return Ok(());
         }
     }
+
+    Ok(())
 }
 
 pub async fn zest_main() -> Result<(), Box<dyn Error>> {
@@ -351,24 +358,66 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
         .await
         .context("failed to init logger")?;
 
-    init_signal().await.context("failed to init signal hook")?;
-
     #[cfg(feature = "lru_cache")]
     init_cache().await.context("failed to init lru cache")?;
 
     loop {
+        let (tx, rx): (Sender<()>, Receiver<()>) = oneshot::channel();
         let config = CONFIG.load();
         let interval = config.server.interval.unwrap_or(*DEFAULT_INTERVAL);
 
-        let handle = tokio::spawn(async move {
-            zest_listener(config.clone()).await.unwrap();
-        });
+        signal_handler(tx)
+            .await
+            .context("failed to init signal hook")?;
 
-        let mut t = T.try_write().unwrap();
-        *t = Some(0);
-        drop(t);
+        zest_listener(config.clone(), rx).await.unwrap();
 
-        let _ = handle.await;
         sleep(interval).await;
     }
+}
+
+pub async fn signal_handler(tx: Sender<()>) -> io::Result<()> {
+    let mut signals = Signals::new([SIGHUP, SIGINT])?;
+
+    tokio::spawn(async move {
+        for sig in signals.forever() {
+            if sig == SIGHUP {
+                let config: crate::config::Config = init_config();
+
+                CONFIG.store(Arc::new(config.clone()));
+
+                set_current_dir(config.clone().server.root).unwrap();
+
+                #[cfg(feature = "log")]
+                {
+                    let mut _handle = LOGGER_HANDLE.lock().await;
+                    if let Some(handle) = _handle.take() {
+                        handle.set_config(build_logger_config(&config.clone()).await);
+                    }
+                }
+
+                let cache = config.server.cache.unwrap_or_default();
+                let (index_capacity, file_capacity) =
+                    (cache.index_capacity.unwrap(), cache.file_capacity.unwrap());
+
+                INDEX_CACHE
+                    .write()
+                    .await
+                    .resize(NonZero::new(index_capacity).unwrap());
+
+                FILE_CACHE
+                    .write()
+                    .await
+                    .resize(NonZero::new(file_capacity).unwrap());
+
+                tx.send(()).unwrap();
+                return;
+            } else if sig == SIGINT {
+                remove_file(PID_FILE.try_lock().unwrap().clone().unwrap().as_path()).unwrap();
+                process::exit(0);
+            }
+        }
+    });
+
+    Ok(())
 }
