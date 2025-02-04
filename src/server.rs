@@ -1,9 +1,6 @@
 use crate::{
     config::{init_config, Config, ARGS, CONFIG, CONFIG_PATH, DEFAULT_CONFIG, DEFAULT_INTERVAL},
-    init::{
-        build_logger_config, init_cache, DATE_FORMAT, FILE_CACHE, INDEX_CACHE, LOGGER_HANDLE,
-        PID_FILE,
-    },
+    init::{DATE_FORMAT, PID_FILE},
     route::{location_index, mime_match, root_relative, status_page},
 };
 
@@ -27,8 +24,14 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "lru_cache")]
+use crate::init::{init_cache, FILE_CACHE, INDEX_CACHE};
+
 #[cfg(feature = "log")]
-use {crate::init::init_logger, log::logger};
+use {
+    crate::init::{build_logger_config, init_logger, LOGGER_HANDLE},
+    log::logger,
+};
 
 #[cfg(target_os = "android")]
 use std::os::android::fs::MetadataExt;
@@ -239,7 +242,7 @@ where
     Ok((response.status_code, req))
 }
 
-pub async fn zest_listener<C>(config: C, rx: Receiver<()>) -> Result<(), Box<dyn Error>>
+async fn zest_listener<C>(config: C, rx: Receiver<()>) -> Result<(), Box<dyn Error>>
 where
     C: Deref<Target = Config>,
 {
@@ -254,8 +257,8 @@ where
         }
     };
 
-    let mut _allowlist: Option<Vec<String>> = config.clone().allowlist;
-    let mut _blocklist: Option<Vec<String>> = config.clone().blocklist;
+    let mut _allowlist: Option<Vec<String>> = config.allowlist.clone();
+    let mut _blocklist: Option<Vec<String>> = config.blocklist.clone();
 
     let rate_limiter = Arc::new(if let Some(rate_limit) = &config.rate_limit {
         Semaphore::new(rate_limit.max_requests)
@@ -265,6 +268,7 @@ where
 
     tokio::select! {
         _ = async {
+            #[allow(unused_labels)]
             'handle: loop {
                 let (mut stream, _addr) = listener.accept().await.unwrap();
                 #[cfg(feature = "ip_limit")]
@@ -298,7 +302,7 @@ where
 
                 let rate_limiter = Arc::clone(&rate_limiter);
                 tokio::spawn(async move {
-                    if rate_limiter.clone().try_acquire_owned().is_ok() {
+                    if rate_limiter.clone().acquire().await.is_ok() {
                         let (_status_code, _req) = handle_connection(stream).await.unwrap_or_default();
 
                         #[cfg(feature = "log")]
@@ -333,7 +337,7 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
     *CONFIG_PATH.lock()? = ARGS.config.clone().unwrap_or_default();
     let config = DEFAULT_CONFIG.deref();
 
-    set_current_dir(config.clone().server.root)?;
+    set_current_dir(config.server.root.clone())?;
 
     let runtime_dir = env::temp_dir();
     let zest_pid = runtime_dir.join("zest.pid");
@@ -376,7 +380,7 @@ pub async fn zest_main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-pub async fn signal_handler(tx: Sender<()>) -> io::Result<()> {
+async fn signal_handler(tx: Sender<()>) -> io::Result<()> {
     let mut signals = Signals::new([SIGHUP, SIGINT])?;
 
     tokio::spawn(async move {

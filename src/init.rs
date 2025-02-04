@@ -3,8 +3,10 @@ use async_mutex::Mutex;
 use async_rwlock::RwLock;
 use lazy_static::lazy_static;
 use log4rs::Handle;
-use lru::LruCache;
 use std::{io, num::NonZeroUsize, path::PathBuf, thread};
+
+#[cfg(feature = "lru_cache")]
+use lru::LruCache;
 
 #[cfg(feature = "log")]
 use {

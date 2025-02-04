@@ -48,7 +48,7 @@ logging: # optional
 ```
 
 **Benchmark (wrk)**
-+ cargo run --release --no-default-features --features=lru_cache -- -p 8080
++ cargo run --release --no-default-features --features=lru_cache
 ```text
 Running 10s test @ http://localhost:8080
   4 threads and 10 connections
